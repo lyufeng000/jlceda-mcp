@@ -1,0 +1,27 @@
+# Dependencies & build outputs
+node_modules/
+dist/
+*.tsbuildinfo
+coverage/
+
+# Logs & temporary artifacts
+*.log
+npm-debug.log*
+.temp/
+temp/
+tmp/
+.tmp/
+
+# REA / CESM SQLite caches (keep schemas, blocks, src, tests, and adapter_bindings JSON)
+catalog/*.sqlite*
+!catalog/adapter_bindings*.json
+
+# Keep core repository directories tracked
+!schemas/
+!blocks/
+!src/
+!tests/
+
+# OS / Editor
+.DS_Store
+Thumbs.db

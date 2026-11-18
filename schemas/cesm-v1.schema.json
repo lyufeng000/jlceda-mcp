@@ -1,0 +1,168 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jlceda-mcp.local/schemas/cesm-v1.schema.json",
+  "title": "Component Electrical Specification Model (CESM)",
+  "type": "object",
+  "required": ["lcsc_id", "mpn", "category", "package", "verified", "pins", "ratings"],
+  "properties": {
+    "lcsc_id": { "type": "string", "pattern": "^C[0-9]+$", "description": "立创商城唯一器件编号" },
+    "mpn": { "type": "string", "description": "原厂完整型号 (Manufacturer Part Number)" },
+    "category": {
+      "type": "string",
+      "enum": [
+        "MCU_SOC", "PMIC_LDO", "PMIC_DCDC", "OPAMP_COMP", "ADC_DAC_VREF",
+        "INTERFACE_XCVR", "ISOLATOR_OPTO", "MOSFET_BJT", "DIODE_SCHOTTKY",
+        "TVS_ESD_MOV", "LED", "RES_CHIP", "RES_SHUNT", "CAP_MLCC",
+        "CAP_AL_ELEC", "CAP_TANTALUM", "IND_POWER", "FERRITE_CMC",
+        "XTAL_PASSIVE", "OSC_ACTIVE", "RELAY_BUZZER", "CONN_USB_TYPEC", "CONN_GENERIC"
+      ]
+    },
+    "package": { "type": "string", "description": "标准封装名，如 LQFP-48, SOT-223, 0402, CASE-A" },
+    "verified": { "type": "boolean", "description": "是否已完成库引脚与 Datasheet 双源对齐校验" },
+    "polarity_spec": {
+      "type": "object",
+      "properties": {
+        "is_polarized": { "type": "boolean" },
+        "anode_pins": { "type": "array", "items": { "type": "string" } },
+        "cathode_pins": { "type": "array", "items": { "type": "string" } },
+        "silkscreen_rule": {
+          "type": "string",
+          "description": "如 BAR_IS_POSITIVE_ANODE (钽电容) / SHADED_IS_NEGATIVE_CATHODE (铝电解) / BAR_IS_CATHODE (二极管)"
+        }
+      }
+    },
+    "pins": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["pin_number", "pin_name", "elec_type"],
+        "properties": {
+          "pin_number": { "type": "string", "description": "与嘉立创EDA Symbol/Pad 严格一致的引脚号" },
+          "pin_name": { "type": "string" },
+          "elec_type": {
+            "type": "string",
+            "enum": [
+              "POWER_IN", "POWER_OUT", "GND", "PUSH_PULL", "OPEN_DRAIN",
+              "INPUT_HIZ", "BIDIR_IO", "ANALOG_IN", "ANALOG_OUT", "SW_NODE", "PASSIVE", "NC"
+            ]
+          },
+          "supply_pin_ref": { "type": "string", "description": "该 IO 归属的供电参考引脚名，如 VDD 或 VDDIO2" },
+          "v_abs_min": { "type": "number" },
+          "v_abs_max": { "type": "number" },
+          "five_volt_tolerant": { "type": "boolean", "default": false },
+          "ft_lost_in_analog_mode": { "type": "boolean", "default": true },
+          "vih_min_expr": { "type": "string", "description": "如 0.7*VDD 或固定值 2.0" },
+          "vil_max_expr": { "type": "string", "description": "如 0.3*VDD 或固定值 0.8" },
+          "iol_max_ma": { "type": "number" },
+          "mandatory_external": {
+            "type": "string",
+            "enum": ["NONE", "DECOUPLING_100NF", "PULLUP_RES", "PULLDOWN_or_PULLUP", "DEDICATED_5K1_GND", "CAP_ONLY_NO_LOAD"]
+          }
+        }
+      }
+    },
+    "ratings": {
+      "type": "object",
+      "properties": {
+        "v_working_max": { "type": "number" },
+        "power_rated_w": { "type": "number" },
+        "r_theta_ja_c_per_w": { "type": "number" },
+        "tj_max_c": { "type": "number" },
+        "dielectric": { "type": "string", "enum": ["C0G_NP0", "X7R", "X5R", "Y5V", "MNO2_TANT", "POLYMER_TANT", "AL_LIQUID", "AL_SOLID"] },
+        "dc_bias_retention_at_80pct_vr": { "type": "number", "description": "80% 额定电压下的有效容量保持率 (0~1)" },
+        "mlcc_output_stable": { "type": "boolean", "description": "LDO 输出是否兼容超低 ESR 陶瓷电容" },
+        "i_rms_a": { "type": "number" },
+        "i_sat_a": { "type": "number" },
+        "v_rwm_v": { "type": "number" },
+        "v_clamp_max_v": { "type": "number" },
+        "c_junction_pf": { "type": "number" },
+        "vgs_rated_for_rdson_min_v": { "type": "number", "description": "MOSFET 保证完全饱和导通的最低栅源驱动电压" },
+        "isolation_vrms": { "type": "number" },
+        "default_output_state": { "type": "string", "enum": ["HIGH", "LOW", "UNDETERMINED"] }
+      }
+    },
+    "typical_application_constraints": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "layout_guidelines": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "从 Datasheet Layout Guidelines 章节提取的原厂 PCB 布局硬性设计准则"
+    },
+    "layoutExample": {
+      "type": "object",
+      "description": "从芯片官方 Datasheet Layout Example 提取的参考 PCB 布局图及结构化铜皮/摆件/过孔拓扑定义",
+      "properties": {
+        "sourceSectionTitle": { "type": "string", "description": "手册章节标题与图号，如 10.2 Layout Example (Figure 67)" },
+        "referenceImageUri": { "type": "string", "description": "本地缓存的原厂参考 PCB 布局截图路径，供多模态并排比对终审" },
+        "copperZones": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["zoneRole", "connectedPins", "relativeLayer", "areaPolicy"],
+            "properties": {
+              "zoneRole": { "type": "string", "enum": ["VIN_POLYGON", "VOUT_POLYGON", "SW_PH_COMPACT_ISLAND", "TOPSIDE_GND_AREA", "ANALOG_QUIET_GND"] },
+              "connectedPins": { "type": "array", "items": { "type": "string" } },
+              "relativeLayer": { "type": "string", "enum": ["MOUNT_LAYER", "ADJACENT_REF_LAYER", "OPPOSITE_LAYER"] },
+              "areaPolicy": { "type": "string", "enum": ["COMPACT_MIN_PARASITIC", "WIDE_LOW_INDUCTANCE", "THERMAL_SPREADING"] },
+              "maxAreaMm2": { "type": "number" }
+            }
+          }
+        },
+        "relativePlacementHints": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["componentRole", "targetPins", "preferredQuadrantDeg", "maxDistanceMm"],
+            "properties": {
+              "componentRole": { "type": "string", "description": "如 CIN_HF, CBOOT, POWER_INDUCTOR, COUT, RFB_DIVIDER, RCOMP_CCOMP" },
+              "targetPins": { "type": "array", "items": { "type": "string" } },
+              "preferredQuadrantDeg": { "type": "number", "description": "相对芯片中心与 Pin1 基准的原厂示范方位角 (0~360 deg)" },
+              "maxDistanceMm": { "type": "number" },
+              "sameLayerMandatory": { "type": "boolean", "default": true }
+            }
+          }
+        },
+        "viaHints": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["viaRole", "targetNetRole", "policy"],
+            "properties": {
+              "viaRole": { "type": "string", "enum": ["GND_RETURN_CLUSTER", "BOOT_SIGNAL_VIA", "FB_SENSE_ROUTING_VIA", "FORBID_VIA_IN_HOT_LOOP"] },
+              "targetNetRole": { "type": "string" },
+              "policy": { "type": "string" }
+            }
+          }
+        },
+        "thermalViaArray": {
+          "type": "object",
+          "properties": {
+            "epadPinNumber": { "type": "string" },
+            "netRole": { "type": "string", "default": "GND" },
+            "gridRows": { "type": "integer" },
+            "gridCols": { "type": "integer" },
+            "drillMm": { "type": "number", "default": 0.3 },
+            "pitchMm": { "type": "number", "default": 1.0 },
+            "solderMaskTentingOrPlug": { "type": "boolean", "default": true }
+          }
+        },
+        "sensitiveRouteConstraints": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["pinOrNetRole", "keepAwayFromRoles", "minClearanceMm"],
+            "properties": {
+              "pinOrNetRole": { "type": "string", "description": "如 VSENSE, FB, COMP, SS_TR" },
+              "keepAwayFromRoles": { "type": "array", "items": { "type": "string" }, "description": "如 SW_PH_COMPACT_ISLAND, POWER_INDUCTOR" },
+              "minClearanceMm": { "type": "number" },
+              "preferInnerOrOppositeLayer": { "type": "boolean", "default": false },
+              "tapPointRule": { "type": "string", "description": "如 AFTER_LAST_COUT_PAD" }
+            }
+          }
+        }
+      }
+    }
+  }
+}

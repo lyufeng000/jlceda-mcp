@@ -1,0 +1,141 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jlceda-mcp.local/schemas/rea-api-entry.schema.json",
+  "title": "JLCEDA_Pro_REA_API_Catalog_Entry",
+  "type": "object",
+  "required": [
+    "apiId",
+    "tier",
+    "domain",
+    "kind",
+    "summaryZh",
+    "keywordsEn",
+    "invocation",
+    "unitContract",
+    "parameters",
+    "returns",
+    "preconditions",
+    "sideEffects",
+    "securityPolicy"
+  ],
+  "properties": {
+    "apiId": {
+      "type": "string",
+      "description": "全局唯一接口标识符，L1 格式为 eda.<ns>.<member>，L2~L4 格式为 cap:<domain>.<module>.<action>"
+    },
+    "tier": {
+      "type": "string",
+      "enum": ["L1_PUBLIC", "L2_COMMAND", "L3_ENGINE", "L4_IPC"]
+    },
+    "domain": {
+      "type": "string",
+      "enum": ["SYS", "DMT", "LIB", "SCH", "PCB", "DRC", "SIM", "VIEW", "IPC"]
+    },
+    "kind": {
+      "type": "string",
+      "enum": ["method", "property", "command", "ipc_channel", "worker_rpc", "enum"]
+    },
+    "namespace": { "type": "string" },
+    "memberName": { "type": "string" },
+    "summaryZh": { "type": "string" },
+    "keywordsEn": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "invocation": {
+      "type": "object",
+      "required": ["targetContext", "asyncMode", "bindingStrategy"],
+      "properties": {
+        "targetContext": {
+          "type": "string",
+          "enum": ["any_editor_renderer", "sch_renderer", "pcb_renderer", "footprint_renderer", "main_process"]
+        },
+        "asyncMode": {
+          "type": "string",
+          "enum": ["sync", "promise", "callback", "event_stream"]
+        },
+        "bindingStrategy": {
+          "type": "string",
+          "enum": ["direct_global_path", "command_dispatcher", "fingerprint_singleton", "ipc_invoke"]
+        },
+        "globalPath": { "type": ["string", "null"] },
+        "commandKey": { "type": ["string", "null"] },
+        "fingerprintAnchor": {
+          "type": ["object", "null"],
+          "properties": {
+            "invariantStrings": { "type": "array", "items": { "type": "string" } },
+            "requiredPeerProperties": { "type": "array", "items": { "type": "string" } },
+            "arity": { "type": "integer" },
+            "parentCommandAnchor": { "type": ["string", "null"] },
+            "fallbackCapabilityId": { "type": ["string", "null"] }
+          }
+        }
+      }
+    },
+    "unitContract": {
+      "type": "object",
+      "required": ["nativeLengthUnit", "nativeAngleUnit", "autoConvertFromMmDeg"],
+      "properties": {
+        "nativeLengthUnit": { "type": "string", "enum": ["none", "mm", "mil", "10mil", "explicit_unit_param"] },
+        "nativeAngleUnit": { "type": "string", "enum": ["none", "deg", "rad"] },
+        "autoConvertFromMmDeg": { "type": "boolean" }
+      }
+    },
+    "parameters": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "required", "schema"],
+        "properties": {
+          "name": { "type": "string" },
+          "required": { "type": "boolean" },
+          "physicalDimension": {
+            "type": ["string", "null"],
+            "enum": [null, "length", "angle", "voltage", "current", "resistance", "capacitance"]
+          },
+          "descriptionZh": { "type": "string" },
+          "schema": { "type": "object" }
+        }
+      }
+    },
+    "returns": {
+      "type": "object",
+      "required": ["descriptionZh", "schema", "wrapAsHandleIfComplex"],
+      "properties": {
+        "descriptionZh": { "type": "string" },
+        "wrapAsHandleIfComplex": { "type": "boolean" },
+        "paginatedArray": { "type": "boolean" },
+        "schema": { "type": "object" }
+      }
+    },
+    "preconditions": {
+      "type": "object",
+      "required": ["requiresOpenProject", "requiredActiveDocumentType", "disallowDuringInteractiveDraw"],
+      "properties": {
+        "requiresOpenProject": { "type": "boolean" },
+        "requiredActiveDocumentType": {
+          "type": "array",
+          "items": { "type": "string", "enum": ["ANY", "SCH", "PCB", "SYMBOL", "FOOTPRINT", "PANEL"] }
+        },
+        "requiresBoardOutline": { "type": "boolean" },
+        "disallowDuringInteractiveDraw": { "type": "boolean" }
+      }
+    },
+    "sideEffects": {
+      "type": "object",
+      "required": ["mutatesCanvas", "pushesUndoStep", "writesLocalDisk", "triggersModalDialog", "networkRequest"],
+      "properties": {
+        "mutatesCanvas": { "type": "boolean" },
+        "pushesUndoStep": { "type": "boolean" },
+        "writesLocalDisk": { "type": "boolean" },
+        "triggersModalDialog": { "type": "boolean" },
+        "networkRequest": { "type": "boolean" },
+        "mustWrapInTransaction": { "type": "boolean" }
+      }
+    },
+    "securityPolicy": {
+      "type": "string",
+      "enum": ["ALLOW", "READ_ONLY_SAFE", "CONFIRM_REQUIRED", "BLOCKED"]
+    }
+  }
+}

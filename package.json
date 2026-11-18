@@ -1,0 +1,45 @@
+{
+  "name": "jlceda-mcp",
+  "version": "0.1.0",
+  "description": "Zero-bridge CDP & REA-powered deterministic hardware design MCP server for JLCEDA Pro (EasyEDA Pro)",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "jlceda-mcp": "dist/cli.js"
+  },
+  "engines": {
+    "node": ">=26.0.0"
+  },
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "doctor": "node dist/cli.js doctor",
+    "index": "node dist/cli.js index",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@jlceda/pro-api-types": "^0.4.30",
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "acorn": "^8.19.0",
+    "acorn-walk": "^8.3.5",
+    "ajv": "^8.20.0",
+    "ajv-formats": "^3.0.1",
+    "clipper2-js": "^1.2.4",
+    "pngjs": "^7.0.0",
+    "rbush": "^4.0.1",
+    "unpdf": "^2.2.1",
+    "ws": "^8.23.0",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "@types/pngjs": "^6.0.5",
+    "@types/rbush": "^4.0.0",
+    "@types/ws": "^8.18.2",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3",
+    "vitest": "^5.1.1"
+  }
+}

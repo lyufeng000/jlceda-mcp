@@ -1,0 +1,298 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jlceda-mcp.local/schemas/constraint-handoff.schema.json",
+  "title": "JLCEDA_Pro_Constraint_Handoff_Package",
+  "type": "object",
+  "required": [
+    "perNetRoutingRules",
+    "emiRoleTags",
+    "datasheetLayoutExamples",
+    "decouplingAndEsdAffinity",
+    "keepoutZones25D"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "default": "1.0.0"
+    },
+    "schDocument": { "type": "string" },
+    "generatedAt": { "type": "string" },
+    "perNetRoutingRules": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "netName",
+          "minWidthMm",
+          "preferredWidthMm",
+          "minClearanceMm",
+          "minParallelVias"
+        ],
+        "properties": {
+          "netName": { "type": "string" },
+          "netClass": { "type": "string" },
+          "voltageRangeV": {
+            "type": "object",
+            "required": ["min", "max"],
+            "properties": {
+              "min": { "type": "number" },
+              "max": { "type": "number" },
+              "surge": { "type": "number" }
+            }
+          },
+          "maxCurrentA": { "type": "number", "minimum": 0 },
+          "minWidthMm": { "type": "number", "exclusiveMinimum": 0 },
+          "preferredWidthMm": { "type": "number", "exclusiveMinimum": 0 },
+          "minClearanceMm": { "type": "number", "exclusiveMinimum": 0 },
+          "minParallelVias": { "type": "integer", "minimum": 1 },
+          "creepageDistanceMm": { "type": "number", "minimum": 0 },
+          "requiresIsolationSlot": { "type": "boolean" },
+          "isolationDomain": { "type": "string" }
+        }
+      }
+    },
+    "emiRoleTags": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["netName", "role"],
+        "properties": {
+          "netName": { "type": "string" },
+          "role": {
+            "type": "string",
+            "enum": [
+              "AGGRESSOR_SW_NODE",
+              "AGGRESSOR_MAGNETIC",
+              "VICTIM_HIGH_Z",
+              "SHUNT_KELVIN_SENSE",
+              "IMPEDANCE_CTRL_DIFF",
+              "RF_CONTROLLED",
+              "STANDARD_DIGITAL",
+              "POWER_RAIL"
+            ]
+          },
+          "targetDiffImpedanceOhm": { "type": "number", "exclusiveMinimum": 0 },
+          "intraPairSkewMaxMm": { "type": "number", "minimum": 0 },
+          "shuntTopology": {
+            "type": "string",
+            "enum": ["LOW_SIDE_SINGLE_ENDED", "HIGH_SIDE_KELVIN_PAIR"]
+          },
+          "forbidRedundantGuardRing": { "type": "boolean" },
+          "forbidBlindThermalVias": { "type": "boolean" },
+          "compactPolygonOnly": { "type": "boolean" },
+          "notes": { "type": "string" }
+        }
+      }
+    },
+    "datasheetLayoutExamples": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["designator", "lcscId", "layoutExample"],
+        "properties": {
+          "designator": { "type": "string" },
+          "lcscId": { "type": "string", "pattern": "^C[0-9]+$" },
+          "mpn": { "type": "string" },
+          "layoutGuidelines": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "layoutExample": {
+            "type": "object",
+            "required": ["sourceSectionTitle"],
+            "properties": {
+              "sourceSectionTitle": { "type": "string" },
+              "referenceImageUri": { "type": "string" },
+              "copperZones": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["zoneRole", "connectedPins", "relativeLayer", "areaPolicy"],
+                  "properties": {
+                    "zoneRole": { "type": "string", "enum": ["VIN_POLYGON", "VOUT_POLYGON", "SW_PH_COMPACT_ISLAND", "TOPSIDE_GND_AREA", "ANALOG_QUIET_GND"] },
+                    "connectedPins": { "type": "array", "items": { "type": "string" } },
+                    "relativeLayer": { "type": "string", "enum": ["MOUNT_LAYER", "ADJACENT_REF_LAYER", "OPPOSITE_LAYER"] },
+                    "areaPolicy": { "type": "string", "enum": ["COMPACT_MIN_PARASITIC", "WIDE_LOW_INDUCTANCE", "THERMAL_SPREADING"] },
+                    "maxAreaMm2": { "type": "number" }
+                  }
+                }
+              },
+              "relativePlacementHints": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["componentRole", "targetPins", "preferredQuadrantDeg", "maxDistanceMm"],
+                  "properties": {
+                    "componentRole": { "type": "string" },
+                    "targetPins": { "type": "array", "items": { "type": "string" } },
+                    "preferredQuadrantDeg": { "type": "number" },
+                    "maxDistanceMm": { "type": "number" },
+                    "sameLayerMandatory": { "type": "boolean", "default": true }
+                  }
+                }
+              },
+              "viaHints": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["viaRole", "targetNetRole", "policy"],
+                  "properties": {
+                    "viaRole": { "type": "string", "enum": ["GND_RETURN_CLUSTER", "BOOT_SIGNAL_VIA", "FB_SENSE_ROUTING_VIA", "FORBID_VIA_IN_HOT_LOOP"] },
+                    "targetNetRole": { "type": "string" },
+                    "policy": { "type": "string" }
+                  }
+                }
+              },
+              "thermalViaArray": {
+                "type": "object",
+                "properties": {
+                  "epadPinNumber": { "type": "string" },
+                  "netRole": { "type": "string", "default": "GND" },
+                  "gridRows": { "type": "integer" },
+                  "gridCols": { "type": "integer" },
+                  "drillMm": { "type": "number", "default": 0.3 },
+                  "pitchMm": { "type": "number", "default": 1.0 },
+                  "solderMaskTentingOrPlug": { "type": "boolean", "default": true }
+                }
+              },
+              "sensitiveRouteConstraints": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["pinOrNetRole", "keepAwayFromRoles", "minClearanceMm"],
+                  "properties": {
+                    "pinOrNetRole": { "type": "string" },
+                    "keepAwayFromRoles": { "type": "array", "items": { "type": "string" } },
+                    "minClearanceMm": { "type": "number" },
+                    "preferInnerOrOppositeLayer": { "type": "boolean", "default": false },
+                    "tapPointRule": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "decouplingAndEsdAffinity": {
+      "type": "object",
+      "required": ["decouplingPairs", "esdInlineChains"],
+      "properties": {
+        "decouplingPairs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "capacitorDesignator",
+              "targetIcDesignator",
+              "targetPinNumber",
+              "powerNet",
+              "groundNet",
+              "maxPathLengthMm",
+              "enforcePowerViaToCapToPinOrder"
+            ],
+            "properties": {
+              "capacitorDesignator": { "type": "string" },
+              "targetIcDesignator": { "type": "string" },
+              "targetPinNumber": { "type": "string" },
+              "targetPinName": { "type": "string" },
+              "powerNet": { "type": "string" },
+              "groundNet": { "type": "string" },
+              "maxPathLengthMm": { "type": "number", "exclusiveMinimum": 0 },
+              "enforcePowerViaToCapToPinOrder": { "type": "boolean" }
+            }
+          }
+        },
+        "esdInlineChains": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "connectorDesignator",
+              "connectorPin",
+              "esdDesignator",
+              "esdPin",
+              "targetIcDesignator",
+              "targetIcPin",
+              "netName",
+              "maxStubMm",
+              "minGroundVias"
+            ],
+            "properties": {
+              "connectorDesignator": { "type": "string" },
+              "connectorPin": { "type": "string" },
+              "esdDesignator": { "type": "string" },
+              "esdPin": { "type": "string" },
+              "targetIcDesignator": { "type": "string" },
+              "targetIcPin": { "type": "string" },
+              "netName": { "type": "string" },
+              "maxStubMm": { "type": "number", "minimum": 0 },
+              "minGroundVias": { "type": "integer", "minimum": 1 }
+            }
+          }
+        }
+      }
+    },
+    "keepoutZones25D": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "polygon2D",
+          "layerSet",
+          "disallowMask",
+          "allowedNets",
+          "mountSide"
+        ],
+        "properties": {
+          "id": { "type": "string" },
+          "category": {
+            "type": "string",
+            "enum": [
+              "POWER_INDUCTOR",
+              "FERRITE_OR_CMC",
+              "PASSIVE_CRYSTAL",
+              "SAFETY_ISOLATION_OR_ETH_HV",
+              "RF_ANTENNA",
+              "OPAMP_IN_MINUS",
+              "MOUNTING_HOLE",
+              "CONNECTOR_CLEARANCE"
+            ]
+          },
+          "ownerDesignator": { "type": "string" },
+          "polygon2D": {
+            "type": "array",
+            "minItems": 3,
+            "items": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "items": { "type": "number" }
+            }
+          },
+          "layerSet": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "type": "string" }
+          },
+          "disallowMask": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "enum": ["COPPER_POUR", "TRACK", "VIA", "PAD", "COMPONENT"]
+            }
+          },
+          "allowedNets": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "mountSide": {
+            "type": "string",
+            "enum": ["TOP", "BOTTOM", "ALL"]
+          }
+        }
+      }
+    }
+  }
+}
