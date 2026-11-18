@@ -1,0 +1,77 @@
+{
+  "blockTemplateId": "BLK_MCU_MIN_SYS",
+  "nameZh": "STM32 微控制器最小系统核心积木",
+  "descriptionZh": "STM32F103C8T6 核心与四对电源脚一对一 100nF 去耦电容、VDDA 磁珠隔离滤波（100nF+1uF）、NRST（10kΩ+100nF）与 BOOT0（10kΩ）防呆偏置及 SWD 调试接口。",
+  "category": "MCU_DIGITAL_CORE",
+  "parametersSchema": {
+    "type": "object",
+    "properties": {
+      "mcu_lcsc": { "type": "string", "default": "C2040" },
+      "vdd_v": { "type": "number", "default": 3.3 },
+      "debug_interface": { "type": "string", "enum": ["SWD", "JTAG"], "default": "SWD" }
+    }
+  },
+  "defaultParameters": {
+    "mcu_lcsc": "C2040",
+    "vdd_v": 3.3,
+    "debug_interface": "SWD"
+  },
+  "components": [
+    { "refRole": "U_MCU", "lcscId": "C2040", "defaultPackage": "LQFP-48_7x7", "valueExpr": "STM32F103C8T6", "relOffsetMm": [15.24, 0], "rotationDeg": 0, "mandatory": true },
+    { "refRole": "C_DEC_1", "lcscId": "C1525", "defaultPackage": "0402", "valueExpr": "100nF", "relOffsetMm": [2.54, 10.16], "rotationDeg": 270, "mandatory": true },
+    { "refRole": "C_DEC_2", "lcscId": "C1525", "defaultPackage": "0402", "valueExpr": "100nF", "relOffsetMm": [5.08, 10.16], "rotationDeg": 270, "mandatory": true },
+    { "refRole": "C_DEC_3", "lcscId": "C1525", "defaultPackage": "0402", "valueExpr": "100nF", "relOffsetMm": [7.62, 10.16], "rotationDeg": 270, "mandatory": true },
+    { "refRole": "C_DEC_4", "lcscId": "C1525", "defaultPackage": "0402", "valueExpr": "100nF", "relOffsetMm": [10.16, 10.16], "rotationDeg": 270, "mandatory": true },
+    { "refRole": "FB_VDDA", "lcscId": "C1017", "defaultPackage": "0603", "valueExpr": "600Ω@100MHz", "relOffsetMm": [25.40, 10.16], "rotationDeg": 0, "mandatory": true },
+    { "refRole": "C_VDDA_HF", "lcscId": "C1525", "defaultPackage": "0402", "valueExpr": "100nF", "relOffsetMm": [30.48, 7.62], "rotationDeg": 270, "mandatory": true },
+    { "refRole": "C_VDDA_BULK", "lcscId": "C52923", "defaultPackage": "0402", "valueExpr": "1uF", "relOffsetMm": [33.02, 7.62], "rotationDeg": 270, "mandatory": true },
+    { "refRole": "R_NRST", "lcscId": "C25744", "defaultPackage": "0402", "valueExpr": "10kΩ", "relOffsetMm": [2.54, -5.08], "rotationDeg": 90, "mandatory": true },
+    { "refRole": "C_NRST", "lcscId": "C1525", "defaultPackage": "0402", "valueExpr": "100nF", "relOffsetMm": [2.54, -10.16], "rotationDeg": 270, "mandatory": true },
+    { "refRole": "R_BOOT0", "lcscId": "C25744", "defaultPackage": "0402", "valueExpr": "10kΩ", "relOffsetMm": [7.62, -10.16], "rotationDeg": 270, "mandatory": true },
+    { "refRole": "J_SWD", "defaultPackage": "HDR-1x4-2.54", "valueExpr": "SWD_4P", "relOffsetMm": [33.02, -5.08], "rotationDeg": 0, "mandatory": true }
+  ],
+  "connections": [
+    { "from": "PORT:VDD_3V3", "to": "U_MCU.24", "netRole": "3V3" },
+    { "from": "PORT:VDD_3V3", "to": "U_MCU.36", "netRole": "3V3" },
+    { "from": "PORT:VDD_3V3", "to": "U_MCU.48", "netRole": "3V3" },
+    { "from": "PORT:VDD_3V3", "to": "U_MCU.1", "netRole": "3V3" },
+    { "from": "PORT:VDD_3V3", "to": "C_DEC_1.1", "netRole": "3V3" },
+    { "from": "PORT:VDD_3V3", "to": "C_DEC_2.1", "netRole": "3V3" },
+    { "from": "PORT:VDD_3V3", "to": "C_DEC_3.1", "netRole": "3V3" },
+    { "from": "PORT:VDD_3V3", "to": "C_DEC_4.1", "netRole": "3V3" },
+    { "from": "PORT:VDD_3V3", "to": "FB_VDDA.1", "netRole": "3V3" },
+    { "from": "PORT:VDD_3V3", "to": "R_NRST.1", "netRole": "3V3" },
+    { "from": "PORT:VDD_3V3", "to": "J_SWD.1", "netRole": "3V3" },
+    { "from": "FB_VDDA.2", "to": "U_MCU.9", "netRole": "VDDA" },
+    { "from": "FB_VDDA.2", "to": "C_VDDA_HF.1", "netRole": "VDDA" },
+    { "from": "FB_VDDA.2", "to": "C_VDDA_BULK.1", "netRole": "VDDA" },
+    { "from": "R_NRST.2", "to": "U_MCU.7", "netRole": "NRST" },
+    { "from": "C_NRST.1", "to": "U_MCU.7", "netRole": "NRST" },
+    { "from": "R_BOOT0.1", "to": "U_MCU.44", "netRole": "BOOT0" },
+    { "from": "U_MCU.34", "to": "J_SWD.2", "netRole": "SWDIO" },
+    { "from": "U_MCU.37", "to": "J_SWD.3", "netRole": "SWCLK" },
+    { "from": "U_MCU.23", "to": "PORT:GND", "netRole": "GND" },
+    { "from": "U_MCU.35", "to": "PORT:GND", "netRole": "GND" },
+    { "from": "U_MCU.47", "to": "PORT:GND", "netRole": "GND" },
+    { "from": "U_MCU.8", "to": "PORT:GND", "netRole": "GND" },
+    { "from": "C_DEC_1.2", "to": "PORT:GND", "netRole": "GND" },
+    { "from": "C_DEC_2.2", "to": "PORT:GND", "netRole": "GND" },
+    { "from": "C_DEC_3.2", "to": "PORT:GND", "netRole": "GND" },
+    { "from": "C_DEC_4.2", "to": "PORT:GND", "netRole": "GND" },
+    { "from": "C_VDDA_HF.2", "to": "PORT:GND", "netRole": "GND" },
+    { "from": "C_VDDA_BULK.2", "to": "PORT:GND", "netRole": "GND" },
+    { "from": "C_NRST.2", "to": "PORT:GND", "netRole": "GND" },
+    { "from": "R_BOOT0.2", "to": "PORT:GND", "netRole": "GND" },
+    { "from": "J_SWD.4", "to": "PORT:GND", "netRole": "GND" }
+  ],
+  "exposedPorts": [
+    { "portName": "VDD_3V3", "relOffsetMm": [0, 12.70], "defaultNetName": "3V3", "direction": "POWER" },
+    { "portName": "OSC_IN", "relOffsetMm": [0, 2.54], "defaultNetName": "OSC_IN", "direction": "BIDIR" },
+    { "portName": "OSC_OUT", "relOffsetMm": [0, -2.54], "defaultNetName": "OSC_OUT", "direction": "BIDIR" },
+    { "portName": "GND", "relOffsetMm": [15.24, -15.24], "defaultNetName": "GND", "direction": "GND" }
+  ],
+  "antiPitfalls": [
+    "1-to-1 100nF MLCC per VDD/VSS pin group (ELINT-012 / PLINT-02)",
+    "NRST biased with 10k+100nF, BOOT0 pulled down with 10k (ELINT-006)"
+  ]
+}

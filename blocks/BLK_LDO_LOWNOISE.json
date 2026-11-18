@@ -1,0 +1,50 @@
+{
+  "blockTemplateId": "BLK_LDO_LOWNOISE",
+  "nameZh": "低噪声陶瓷电容稳定型 LDO 稳压积木",
+  "descriptionZh": "采用 MLCC 稳定型高 PSRR CMOS LDO（RT9013-33），集成输入/输出 X7R 电容与降噪旁路电容，并强制执行 ldo_thermal 热预算校验（PD>0.6W 或 TJ>105°C 拦截转 Buck）。",
+  "category": "LDO_REGULATOR",
+  "parametersSchema": {
+    "type": "object",
+    "properties": {
+      "v_in_min": { "type": "number", "default": 4.5 },
+      "v_in_max": { "type": "number", "default": 5.5 },
+      "v_out": { "type": "number", "default": 3.3 },
+      "i_load_avg": { "type": "number", "default": 0.15 },
+      "t_ambient_c": { "type": "number", "default": 45 }
+    }
+  },
+  "defaultParameters": {
+    "v_in_min": 4.5,
+    "v_in_max": 5.5,
+    "v_out": 3.3,
+    "i_load_avg": 0.15,
+    "t_ambient_c": 45
+  },
+  "components": [
+    { "refRole": "U_LDO", "lcscId": "C47773", "defaultPackage": "SOT-23-5", "valueExpr": "RT9013-33GB", "relOffsetMm": [10.16, 0], "rotationDeg": 0, "mandatory": true },
+    { "refRole": "C_IN", "lcscId": "C52923", "defaultPackage": "0402", "valueExpr": "1uF", "relOffsetMm": [2.54, -2.54], "rotationDeg": 270, "mandatory": true },
+    { "refRole": "C_OUT", "lcscId": "C52923", "defaultPackage": "0402", "valueExpr": "1uF", "relOffsetMm": [17.78, -2.54], "rotationDeg": 270, "mandatory": true },
+    { "refRole": "C_BYP", "lcscId": "C15195", "defaultPackage": "0402", "valueExpr": "10nF", "relOffsetMm": [17.78, -7.62], "rotationDeg": 270, "mandatory": false }
+  ],
+  "connections": [
+    { "from": "PORT:VIN", "to": "C_IN.1", "netRole": "VIN" },
+    { "from": "PORT:VIN", "to": "U_LDO.1", "netRole": "VIN" },
+    { "from": "PORT:VIN", "to": "U_LDO.3", "netRole": "VIN" },
+    { "from": "U_LDO.5", "to": "C_OUT.1", "netRole": "VOUT" },
+    { "from": "U_LDO.5", "to": "PORT:VOUT", "netRole": "VOUT" },
+    { "from": "U_LDO.4", "to": "C_BYP.1", "netRole": "LDO_BYP" },
+    { "from": "U_LDO.2", "to": "PORT:GND", "netRole": "GND" },
+    { "from": "C_IN.2", "to": "PORT:GND", "netRole": "GND" },
+    { "from": "C_OUT.2", "to": "PORT:GND", "netRole": "GND" },
+    { "from": "C_BYP.2", "to": "PORT:GND", "netRole": "GND" }
+  ],
+  "exposedPorts": [
+    { "portName": "VIN", "relOffsetMm": [0, 0], "defaultNetName": "VIN_5V", "direction": "POWER" },
+    { "portName": "VOUT", "relOffsetMm": [22.86, 0], "defaultNetName": "3V3_ANA", "direction": "POWER" },
+    { "portName": "GND", "relOffsetMm": [10.16, -12.70], "defaultNetName": "GND", "direction": "GND" }
+  ],
+  "antiPitfalls": [
+    "Replaces legacy 1117 to prevent MLCC ultra-low ESR oscillation (ELINT-011)",
+    "Blocks PD > 0.6W or TJ > 105C via ldo_thermal calculator (ELINT-010)"
+  ]
+}

@@ -1,0 +1,49 @@
+{
+  "blockTemplateId": "BLK_XTAL_PASSIVE",
+  "nameZh": "无源石英晶振 C0G 精确匹配积木",
+  "descriptionZh": "4 脚无源贴片晶振（金属壳 2/4 脚强制接地）配 C0G/NP0 匹配电容对（由 crystal_load_cap 按 C1=C2=2*(CL-Cstray) 自动计算），并预留 OSC_OUT 串联阻尼电阻位。",
+  "category": "CLOCK_OSCILLATOR",
+  "parametersSchema": {
+    "type": "object",
+    "properties": {
+      "xtal_lcsc": { "type": "string", "default": "C13738" },
+      "freq_mhz": { "type": "number", "default": 8.0 },
+      "cl_datasheet_pf": { "type": "number", "default": 12.0 },
+      "c_pin_pf": { "type": "number", "default": 2.0 },
+      "c_trace_pf": { "type": "number", "default": 2.0 }
+    }
+  },
+  "defaultParameters": {
+    "xtal_lcsc": "C13738",
+    "freq_mhz": 8.0,
+    "cl_datasheet_pf": 12.0,
+    "c_pin_pf": 2.0,
+    "c_trace_pf": 2.0
+  },
+  "components": [
+    { "refRole": "Y_XTAL", "lcscId": "C13738", "defaultPackage": "SMD-3225-4P", "valueExpr": "${freq_mhz}MHz_${cl_datasheet_pf}pF", "relOffsetMm": [10.16, 0], "rotationDeg": 0, "mandatory": true },
+    { "refRole": "R_EXT", "lcscId": "C17168", "defaultPackage": "0402", "valueExpr": "0Ω", "relOffsetMm": [5.08, -2.54], "rotationDeg": 0, "mandatory": true },
+    { "refRole": "C_LOAD_1", "lcscId": "C1549", "defaultPackage": "0402", "valueExpr": "${calc.c1_c2_standard_pf}pF_C0G", "relOffsetMm": [7.62, -7.62], "rotationDeg": 270, "mandatory": true },
+    { "refRole": "C_LOAD_2", "lcscId": "C1549", "defaultPackage": "0402", "valueExpr": "${calc.c1_c2_standard_pf}pF_C0G", "relOffsetMm": [12.70, -7.62], "rotationDeg": 270, "mandatory": true }
+  ],
+  "connections": [
+    { "from": "PORT:OSC_IN", "to": "Y_XTAL.1", "netRole": "OSC_IN" },
+    { "from": "PORT:OSC_IN", "to": "C_LOAD_1.1", "netRole": "OSC_IN" },
+    { "from": "PORT:OSC_OUT", "to": "R_EXT.1", "netRole": "OSC_OUT_DRV" },
+    { "from": "R_EXT.2", "to": "Y_XTAL.3", "netRole": "OSC_OUT_XTAL" },
+    { "from": "R_EXT.2", "to": "C_LOAD_2.1", "netRole": "OSC_OUT_XTAL" },
+    { "from": "Y_XTAL.2", "to": "PORT:GND", "netRole": "GND" },
+    { "from": "Y_XTAL.4", "to": "PORT:GND", "netRole": "GND" },
+    { "from": "C_LOAD_1.2", "to": "PORT:GND", "netRole": "GND" },
+    { "from": "C_LOAD_2.2", "to": "PORT:GND", "netRole": "GND" }
+  ],
+  "exposedPorts": [
+    { "portName": "OSC_IN", "relOffsetMm": [0, 2.54], "defaultNetName": "OSC_IN", "direction": "BIDIR" },
+    { "portName": "OSC_OUT", "relOffsetMm": [0, -2.54], "defaultNetName": "OSC_OUT", "direction": "BIDIR" },
+    { "portName": "GND", "relOffsetMm": [10.16, -12.70], "defaultNetName": "GND", "direction": "GND" }
+  ],
+  "antiPitfalls": [
+    "Enforces C0G/NP0 dielectric and C1=C2=2*(CL-Cstray) (ELINT-014 / ELINT-027)",
+    "Metal shield pins 2 & 4 solidly grounded"
+  ]
+}

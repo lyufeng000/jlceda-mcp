@@ -1,0 +1,57 @@
+{
+  "blockTemplateId": "BLK_ETH_RJ45_BOBSMITH",
+  "nameZh": "百兆/千兆以太网 RJ45 磁耦合与 Bob-Smith 高压端接积木",
+  "descriptionZh": "RJ45 集成网络变压器 + 电压型 PHY 中心抽头 100nF 对地去耦（禁直连 3.3V）+ 次级 75Ω×4 汇接 1nF/2kV (1206) 高压电容泄放至独立机壳地 PGND。",
+  "category": "HIGH_SPEED_IO_ESD",
+  "parametersSchema": {
+    "type": "object",
+    "properties": {
+      "phy_drive_type": { "type": "string", "enum": ["VOLTAGE_MODE", "CURRENT_MODE"], "default": "VOLTAGE_MODE" },
+      "speed": { "type": "string", "enum": ["100M", "1000M"], "default": "100M" }
+    }
+  },
+  "defaultParameters": {
+    "phy_drive_type": "VOLTAGE_MODE",
+    "speed": "100M"
+  },
+  "components": [
+    { "refRole": "J_ETH", "lcscId": "C15401", "defaultPackage": "RJ45-MAGJACK", "valueExpr": "HR911105A", "relOffsetMm": [15.24, 0], "rotationDeg": 0, "mandatory": true },
+    { "refRole": "C_CT_TX", "lcscId": "C1525", "defaultPackage": "0402", "valueExpr": "100nF", "relOffsetMm": [5.08, 7.62], "rotationDeg": 270, "mandatory": true },
+    { "refRole": "C_CT_RX", "lcscId": "C1525", "defaultPackage": "0402", "valueExpr": "100nF", "relOffsetMm": [5.08, -7.62], "rotationDeg": 270, "mandatory": true },
+    { "refRole": "R_BS_1", "lcscId": "C23244", "defaultPackage": "0603", "valueExpr": "75Ω", "relOffsetMm": [25.40, 7.62], "rotationDeg": 0, "mandatory": true },
+    { "refRole": "R_BS_2", "lcscId": "C23244", "defaultPackage": "0603", "valueExpr": "75Ω", "relOffsetMm": [25.40, 2.54], "rotationDeg": 0, "mandatory": true },
+    { "refRole": "R_BS_3", "lcscId": "C23244", "defaultPackage": "0603", "valueExpr": "75Ω", "relOffsetMm": [25.40, -2.54], "rotationDeg": 0, "mandatory": true },
+    { "refRole": "R_BS_4", "lcscId": "C23244", "defaultPackage": "0603", "valueExpr": "75Ω", "relOffsetMm": [25.40, -7.62], "rotationDeg": 0, "mandatory": true },
+    { "refRole": "C_BS_HV", "lcscId": "C9196", "defaultPackage": "1206", "valueExpr": "1nF/2kV", "relOffsetMm": [33.02, -7.62], "rotationDeg": 270, "mandatory": true }
+  ],
+  "connections": [
+    { "from": "PORT:ETH_TXP", "to": "J_ETH.1", "netRole": "ETH_TXP" },
+    { "from": "PORT:ETH_TXN", "to": "J_ETH.2", "netRole": "ETH_TXN" },
+    { "from": "PORT:ETH_RXP", "to": "J_ETH.3", "netRole": "ETH_RXP" },
+    { "from": "PORT:ETH_RXN", "to": "J_ETH.6", "netRole": "ETH_RXN" },
+    { "from": "J_ETH.4", "to": "C_CT_TX.1", "netRole": "ETH_CT_TX" },
+    { "from": "C_CT_TX.2", "to": "PORT:GND", "netRole": "GND" },
+    { "from": "J_ETH.5", "to": "C_CT_RX.1", "netRole": "ETH_CT_RX" },
+    { "from": "C_CT_RX.2", "to": "PORT:GND", "netRole": "GND" },
+    { "from": "J_ETH.7", "to": "R_BS_1.1", "netRole": "RJ_CT_1" },
+    { "from": "J_ETH.8", "to": "R_BS_2.1", "netRole": "RJ_CT_2" },
+    { "from": "R_BS_1.2", "to": "C_BS_HV.1", "netRole": "BOBSMITH_SUM" },
+    { "from": "R_BS_2.2", "to": "C_BS_HV.1", "netRole": "BOBSMITH_SUM" },
+    { "from": "R_BS_3.2", "to": "C_BS_HV.1", "netRole": "BOBSMITH_SUM" },
+    { "from": "R_BS_4.2", "to": "C_BS_HV.1", "netRole": "BOBSMITH_SUM" },
+    { "from": "C_BS_HV.2", "to": "PORT:PGND", "netRole": "PGND" },
+    { "from": "J_ETH.S1", "to": "PORT:PGND", "netRole": "PGND" }
+  ],
+  "exposedPorts": [
+    { "portName": "ETH_TXP", "relOffsetMm": [0, 5.08], "defaultNetName": "ETH_TXP", "direction": "BIDIR" },
+    { "portName": "ETH_TXN", "relOffsetMm": [0, 2.54], "defaultNetName": "ETH_TXN", "direction": "BIDIR" },
+    { "portName": "ETH_RXP", "relOffsetMm": [0, -2.54], "defaultNetName": "ETH_RXP", "direction": "BIDIR" },
+    { "portName": "ETH_RXN", "relOffsetMm": [0, -5.08], "defaultNetName": "ETH_RXN", "direction": "BIDIR" },
+    { "portName": "GND", "relOffsetMm": [5.08, -15.24], "defaultNetName": "GND", "direction": "GND" },
+    { "portName": "PGND", "relOffsetMm": [33.02, -15.24], "defaultNetName": "PGND", "direction": "GND" }
+  ],
+  "antiPitfalls": [
+    "Voltage-mode PHY center taps decoupled to GND via 100nF only (not tied to 3.3V)",
+    "Bob-Smith 75 Ohm x4 -> 1nF/2kV 1206 HV cap -> isolated PGND (>=2mm keepout from GND)"
+  ]
+}

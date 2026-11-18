@@ -1,0 +1,161 @@
+{
+  "schemaVersion": "1.0.0",
+  "asarSha256": "043f1cfde9a0103e42d56f52b448f156efe58fdee4b960504fbced363e393340",
+  "clientVersion": "4.1.105.0339a6cd",
+  "generatedAt": "2026-11-18T21:00:56.536Z",
+  "bindings": {
+    "cap:core.history.beginCompositeStep": {
+      "capabilityId": "cap:core.history.beginCompositeStep",
+      "tier": "L3_ENGINE",
+      "bound": true,
+      "degraded": false,
+      "confidenceScore": 1,
+      "resolvedPath": "assets/pro-pcb/4.1.88.9231654e/js/pcb-panelize.js::hHA",
+      "resolvedSymbol": "hHA.begin",
+      "moduleId": "assets/pro-pcb/4.1.88.9231654e/js/pcb-panelize.js#cls_2910",
+      "commandKey": null,
+      "fallbackCapabilityId": "eda.sys_MessageBus.publish",
+      "matchedAnchors": {
+        "invariantStringsMatched": 3,
+        "peerPropertiesMatched": 5,
+        "arityMatched": true,
+        "commandCallGraphHops": 0
+      },
+      "reason": "Three-anchor fingerprint matched (1.0000 >= 0.92)."
+    },
+    "cap:core.history.commitTransaction": {
+      "capabilityId": "cap:core.history.commitTransaction",
+      "tier": "L3_ENGINE",
+      "bound": true,
+      "degraded": false,
+      "confidenceScore": 1,
+      "resolvedPath": "assets/pro-pcb/4.1.88.9231654e/js/pcb-panelize.js::hHA",
+      "resolvedSymbol": "hHA.commit",
+      "moduleId": "assets/pro-pcb/4.1.88.9231654e/js/pcb-panelize.js#cls_2910",
+      "commandKey": null,
+      "fallbackCapabilityId": null,
+      "matchedAnchors": {
+        "invariantStringsMatched": 2,
+        "peerPropertiesMatched": 4,
+        "arityMatched": true,
+        "commandCallGraphHops": 0
+      },
+      "reason": "Three-anchor fingerprint matched (1.0000 >= 0.92)."
+    },
+    "cap:core.history.rollbackTo": {
+      "capabilityId": "cap:core.history.rollbackTo",
+      "tier": "L3_ENGINE",
+      "bound": true,
+      "degraded": false,
+      "confidenceScore": 1,
+      "resolvedPath": "assets/pro-pcb/4.1.88.9231654e/js/pcb-panelize.js::hHA",
+      "resolvedSymbol": "hHA.rollback",
+      "moduleId": "assets/pro-pcb/4.1.88.9231654e/js/pcb-panelize.js#cls_2910",
+      "commandKey": null,
+      "fallbackCapabilityId": null,
+      "matchedAnchors": {
+        "invariantStringsMatched": 3,
+        "peerPropertiesMatched": 5,
+        "arityMatched": true,
+        "commandCallGraphHops": 0
+      },
+      "reason": "Three-anchor fingerprint matched (1.0000 >= 0.92)."
+    },
+    "cap:pcb.dsn.exportSilent": {
+      "capabilityId": "cap:pcb.dsn.exportSilent",
+      "tier": "L3_ENGINE",
+      "bound": true,
+      "degraded": false,
+      "confidenceScore": 0.97,
+      "resolvedPath": "assets/pro-pcb/4.1.88.9231654e/js/pcb-panelize.js::Ct",
+      "resolvedSymbol": "Ct.exportDSN1",
+      "moduleId": "assets/pro-pcb/4.1.88.9231654e/js/pcb-panelize.js#cls_2427",
+      "commandKey": "exportDSN",
+      "fallbackCapabilityId": "cap:cmd.exportDSN",
+      "matchedAnchors": {
+        "invariantStringsMatched": 6,
+        "peerPropertiesMatched": 4,
+        "arityMatched": true,
+        "commandCallGraphHops": 2
+      },
+      "reason": "Three-anchor fingerprint matched (0.9700 >= 0.92)."
+    },
+    "cap:pcb.ses.importSilent": {
+      "capabilityId": "cap:pcb.ses.importSilent",
+      "tier": "L3_ENGINE",
+      "bound": true,
+      "degraded": false,
+      "confidenceScore": 0.97,
+      "resolvedPath": "assets/pro-pcb/4.1.88.9231654e/js/pcb-panelize.js::Ct",
+      "resolvedSymbol": "Ct.importSession",
+      "moduleId": "assets/pro-pcb/4.1.88.9231654e/js/pcb-panelize.js#cls_2427",
+      "commandKey": "importSes",
+      "fallbackCapabilityId": "cap:cmd.importSes",
+      "matchedAnchors": {
+        "invariantStringsMatched": 4,
+        "peerPropertiesMatched": 4,
+        "arityMatched": true,
+        "commandCallGraphHops": 2
+      },
+      "reason": "Three-anchor fingerprint matched (0.9700 >= 0.92)."
+    },
+    "cap:pcb.drc.readWriteRuleTree": {
+      "capabilityId": "cap:pcb.drc.readWriteRuleTree",
+      "tier": "L3_ENGINE",
+      "bound": true,
+      "degraded": false,
+      "confidenceScore": 1,
+      "resolvedPath": "assets/pro-pcb/4.1.88.9231654e/js/decodeWorker.js::zt",
+      "resolvedSymbol": "zt.getSpecctraNetClass",
+      "moduleId": "assets/pro-pcb/4.1.88.9231654e/js/decodeWorker.js#cls_937",
+      "commandKey": null,
+      "fallbackCapabilityId": "eda.pcb_Drc.getCurrentRuleConfiguration",
+      "matchedAnchors": {
+        "invariantStringsMatched": 5,
+        "peerPropertiesMatched": 5,
+        "arityMatched": true,
+        "commandCallGraphHops": 0
+      },
+      "reason": "Three-anchor fingerprint matched (1.0000 >= 0.92)."
+    },
+    "cap:pcb.router.internalDiffRoute": {
+      "capabilityId": "cap:pcb.router.internalDiffRoute",
+      "tier": "L3_ENGINE",
+      "bound": true,
+      "degraded": false,
+      "confidenceScore": 1,
+      "resolvedPath": "assets/pro-pcb/4.1.88.9231654e/js/decodeWorker.js::zt",
+      "resolvedSymbol": "zt.getAllNetDifferentials",
+      "moduleId": "assets/pro-pcb/4.1.88.9231654e/js/decodeWorker.js#cls_937",
+      "commandKey": "diffPairEqualLengthTuning",
+      "fallbackCapabilityId": "cap:cmd.diffPairEqualLengthTuning",
+      "matchedAnchors": {
+        "invariantStringsMatched": 4,
+        "peerPropertiesMatched": 5,
+        "arityMatched": true,
+        "commandCallGraphHops": 1
+      },
+      "reason": "Three-anchor fingerprint matched (1.0000 >= 0.92)."
+    },
+    "cap:ipc.localLib.querySqliteCatalog": {
+      "capabilityId": "cap:ipc.localLib.querySqliteCatalog",
+      "tier": "L4_IPC",
+      "bound": true,
+      "degraded": false,
+      "confidenceScore": 1,
+      "resolvedPath": "/mgr/libWorker/getDevice",
+      "resolvedSymbol": "local-db:query-device-catalog",
+      "moduleId": "ipc-channel",
+      "commandKey": "/mgr/libWorker/getDevice",
+      "fallbackCapabilityId": "eda.lib_Device.search",
+      "matchedAnchors": {
+        "invariantStringsMatched": 3,
+        "peerPropertiesMatched": 3,
+        "arityMatched": true,
+        "commandCallGraphHops": 0
+      },
+      "reason": "Matched 3 IPC/worker channel anchors cleanly."
+    }
+  },
+  "degradedCapabilities": []
+}

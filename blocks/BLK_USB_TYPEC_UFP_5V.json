@@ -1,0 +1,61 @@
+{
+  "blockTemplateId": "BLK_USB_TYPEC_UFP_5V",
+  "nameZh": "USB Type-C UFP 5V 受电与 USB2.0 ESD 防护积木",
+  "descriptionZh": "16P Type-C 母座配两颗独立 5.1kΩ CC1/CC2 下拉电阻（严禁短接共用）、A6+B6/A7+B7 正反插短接合并、VBUS 5V TVS 与 <1pF USBLC6-2SC6 穿焊盘 ESD 阵列。",
+  "category": "HIGH_SPEED_IO_ESD",
+  "parametersSchema": {
+    "type": "object",
+    "properties": {
+      "expose_usb2_data": { "type": "boolean", "default": true },
+      "vbus_fuse_a": { "type": "number", "default": 1.5 }
+    }
+  },
+  "defaultParameters": {
+    "expose_usb2_data": true,
+    "vbus_fuse_a": 1.5
+  },
+  "components": [
+    { "refRole": "J_USB", "lcscId": "C2765186", "defaultPackage": "USB-C-SMD-16P", "valueExpr": "TYPE-C-16P", "relOffsetMm": [0, 0], "rotationDeg": 0, "mandatory": true },
+    { "refRole": "R_CC1", "lcscId": "C25905", "defaultPackage": "0402", "valueExpr": "5.1kΩ", "relOffsetMm": [10.16, -7.62], "rotationDeg": 0, "mandatory": true },
+    { "refRole": "R_CC2", "lcscId": "C25905", "defaultPackage": "0402", "valueExpr": "5.1kΩ", "relOffsetMm": [10.16, -12.70], "rotationDeg": 0, "mandatory": true },
+    { "refRole": "F_VBUS", "defaultPackage": "0805", "valueExpr": "${vbus_fuse_a}A_PPTC", "relOffsetMm": [10.16, 7.62], "rotationDeg": 0, "mandatory": false },
+    { "refRole": "D_VBUS_TVS", "lcscId": "C81598", "defaultPackage": "SOD-123FL", "valueExpr": "SMF5.0A", "relOffsetMm": [17.78, 7.62], "rotationDeg": 270, "mandatory": true },
+    { "refRole": "C_VBUS", "lcscId": "C1525", "defaultPackage": "0402", "valueExpr": "100nF", "relOffsetMm": [22.86, 7.62], "rotationDeg": 270, "mandatory": true },
+    { "refRole": "U_ESD", "lcscId": "C7519", "defaultPackage": "SOT-23-6", "valueExpr": "USBLC6-2SC6", "relOffsetMm": [17.78, 0], "rotationDeg": 0, "mandatory": true }
+  ],
+  "connections": [
+    { "from": "J_USB.A4/B9", "to": "F_VBUS.1", "netRole": "VBUS_RAW" },
+    { "from": "J_USB.B4/A9", "to": "F_VBUS.1", "netRole": "VBUS_RAW" },
+    { "from": "F_VBUS.2", "to": "D_VBUS_TVS.1", "netRole": "VBUS_5V" },
+    { "from": "F_VBUS.2", "to": "C_VBUS.1", "netRole": "VBUS_5V" },
+    { "from": "F_VBUS.2", "to": "U_ESD.5", "netRole": "VBUS_5V" },
+    { "from": "F_VBUS.2", "to": "PORT:VBUS_5V", "netRole": "VBUS_5V" },
+    { "from": "J_USB.A5", "to": "R_CC1.1", "netRole": "USB_CC1" },
+    { "from": "R_CC1.2", "to": "PORT:GND", "netRole": "GND" },
+    { "from": "J_USB.B5", "to": "R_CC2.1", "netRole": "USB_CC2" },
+    { "from": "R_CC2.2", "to": "PORT:GND", "netRole": "GND" },
+    { "from": "J_USB.A6", "to": "U_ESD.1", "netRole": "USB_DP_CON" },
+    { "from": "J_USB.B6", "to": "U_ESD.1", "netRole": "USB_DP_CON" },
+    { "from": "U_ESD.6", "to": "PORT:USB_DP", "netRole": "USB_DP" },
+    { "from": "J_USB.A7", "to": "U_ESD.3", "netRole": "USB_DN_CON" },
+    { "from": "J_USB.B7", "to": "U_ESD.3", "netRole": "USB_DN_CON" },
+    { "from": "U_ESD.4", "to": "PORT:USB_DN", "netRole": "USB_DN" },
+    { "from": "J_USB.A1/B12", "to": "PORT:GND", "netRole": "GND" },
+    { "from": "J_USB.B1/A12", "to": "PORT:GND", "netRole": "GND" },
+    { "from": "J_USB.S1", "to": "PORT:GND", "netRole": "GND" },
+    { "from": "D_VBUS_TVS.2", "to": "PORT:GND", "netRole": "GND" },
+    { "from": "C_VBUS.2", "to": "PORT:GND", "netRole": "GND" },
+    { "from": "U_ESD.2", "to": "PORT:GND", "netRole": "GND" }
+  ],
+  "exposedPorts": [
+    { "portName": "VBUS_5V", "relOffsetMm": [27.94, 7.62], "defaultNetName": "VBUS_5V", "direction": "POWER" },
+    { "portName": "USB_DP", "relOffsetMm": [27.94, 2.54], "defaultNetName": "USB_DP", "direction": "BIDIR" },
+    { "portName": "USB_DN", "relOffsetMm": [27.94, -2.54], "defaultNetName": "USB_DN", "direction": "BIDIR" },
+    { "portName": "GND", "relOffsetMm": [27.94, -12.70], "defaultNetName": "GND", "direction": "GND" }
+  ],
+  "antiPitfalls": [
+    "CC1 and CC2 use two strictly independent 5.1k resistors (ELINT-019)",
+    "A6+B6 and A7+B7 shorted for reversible USB 2.0",
+    "USBLC6-2SC6 (<1pF) routed inline with zero stub (ELINT-020/PLINT-09)"
+  ]
+}

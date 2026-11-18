@@ -1,0 +1,72 @@
+{
+  "blockTemplateId": "BLK_BUS_RS485_CAN",
+  "nameZh": "RS-485 / CAN 隔离防雷总线接口积木",
+  "descriptionZh": "收发器（SP3485，可选 ISO7741 隔离域）+ PPTC 自恢复保险丝 + 共模电感 + SM712 专用 TVS + 可选 120Ω 0805 终端匹配电阻。",
+  "category": "HIGH_SPEED_IO_ESD",
+  "parametersSchema": {
+    "type": "object",
+    "properties": {
+      "protocol": { "type": "string", "enum": ["RS485", "CAN"], "default": "RS485" },
+      "is_end_node": { "type": "boolean", "default": true },
+      "isolated": { "type": "boolean", "default": true }
+    }
+  },
+  "defaultParameters": {
+    "protocol": "RS485",
+    "is_end_node": true,
+    "isolated": true
+  },
+  "components": [
+    { "refRole": "U_ISO", "lcscId": "C498300", "defaultPackage": "SOIC-16W", "valueExpr": "ISO7741FDWR", "relOffsetMm": [5.08, 0], "rotationDeg": 0, "mandatory": false },
+    { "refRole": "U_XCVR", "lcscId": "C8963", "defaultPackage": "SOIC-8", "valueExpr": "SP3485EN", "relOffsetMm": [15.24, 0], "rotationDeg": 0, "mandatory": true },
+    { "refRole": "C_DEC", "lcscId": "C1525", "defaultPackage": "0402", "valueExpr": "100nF", "relOffsetMm": [15.24, 7.62], "rotationDeg": 270, "mandatory": true },
+    { "refRole": "R_TERM", "lcscId": "C17437", "defaultPackage": "0805", "valueExpr": "120Ω_0.25W", "relOffsetMm": [22.86, 0], "rotationDeg": 270, "mandatory": false },
+    { "refRole": "D_TVS", "lcscId": "C16137", "defaultPackage": "SOT-23-3", "valueExpr": "SM712", "relOffsetMm": [27.94, 0], "rotationDeg": 0, "mandatory": true },
+    { "refRole": "L_CMC", "defaultPackage": "CMC-4532", "valueExpr": "ACT45B-510", "relOffsetMm": [33.02, 0], "rotationDeg": 0, "mandatory": true },
+    { "refRole": "F_PTC_A", "defaultPackage": "1206", "valueExpr": "PPTC_150mA", "relOffsetMm": [38.10, 2.54], "rotationDeg": 0, "mandatory": true },
+    { "refRole": "F_PTC_B", "defaultPackage": "1206", "valueExpr": "PPTC_150mA", "relOffsetMm": [38.10, -2.54], "rotationDeg": 0, "mandatory": true }
+  ],
+  "connections": [
+    { "from": "PORT:VCC_PRI", "to": "U_ISO.1", "netRole": "VCC_PRI" },
+    { "from": "PORT:GND_PRI", "to": "U_ISO.2", "netRole": "GND_PRI" },
+    { "from": "PORT:UART_TX", "to": "U_ISO.3", "netRole": "UART_TX" },
+    { "from": "PORT:RS485_DE", "to": "U_ISO.4", "netRole": "RS485_DE" },
+    { "from": "U_ISO.6", "to": "PORT:UART_RX", "netRole": "UART_RX" },
+    { "from": "U_ISO.14", "to": "U_XCVR.4", "netRole": "ISO_DI" },
+    { "from": "U_ISO.13", "to": "U_XCVR.3", "netRole": "ISO_DE" },
+    { "from": "U_ISO.13", "to": "U_XCVR.2", "netRole": "ISO_DE" },
+    { "from": "U_XCVR.1", "to": "U_ISO.11", "netRole": "ISO_RO" },
+    { "from": "PORT:VCC_ISO", "to": "U_ISO.16", "netRole": "VCC_ISO" },
+    { "from": "PORT:VCC_ISO", "to": "U_XCVR.8", "netRole": "VCC_ISO" },
+    { "from": "PORT:VCC_ISO", "to": "C_DEC.1", "netRole": "VCC_ISO" },
+    { "from": "PORT:GND_ISO", "to": "U_ISO.15", "netRole": "GND_ISO" },
+    { "from": "PORT:GND_ISO", "to": "U_XCVR.5", "netRole": "GND_ISO" },
+    { "from": "PORT:GND_ISO", "to": "C_DEC.2", "netRole": "GND_ISO" },
+    { "from": "PORT:GND_ISO", "to": "D_TVS.3", "netRole": "GND_ISO" },
+    { "from": "U_XCVR.6", "to": "R_TERM.1", "netRole": "BUS_A_INT" },
+    { "from": "U_XCVR.6", "to": "D_TVS.1", "netRole": "BUS_A_INT" },
+    { "from": "D_TVS.1", "to": "L_CMC.1", "netRole": "BUS_A_INT" },
+    { "from": "L_CMC.2", "to": "F_PTC_A.1", "netRole": "BUS_A_PROT" },
+    { "from": "F_PTC_A.2", "to": "PORT:BUS_A", "netRole": "BUS_A" },
+    { "from": "U_XCVR.7", "to": "R_TERM.2", "netRole": "BUS_B_INT" },
+    { "from": "U_XCVR.7", "to": "D_TVS.2", "netRole": "BUS_B_INT" },
+    { "from": "D_TVS.2", "to": "L_CMC.3", "netRole": "BUS_B_INT" },
+    { "from": "L_CMC.4", "to": "F_PTC_B.1", "netRole": "BUS_B_PROT" },
+    { "from": "F_PTC_B.2", "to": "PORT:BUS_B", "netRole": "BUS_B" }
+  ],
+  "exposedPorts": [
+    { "portName": "VCC_PRI", "relOffsetMm": [0, 7.62], "defaultNetName": "3V3", "direction": "POWER" },
+    { "portName": "GND_PRI", "relOffsetMm": [0, -7.62], "defaultNetName": "GND", "direction": "GND" },
+    { "portName": "UART_TX", "relOffsetMm": [0, 2.54], "defaultNetName": "RS485_TX", "direction": "IN" },
+    { "portName": "UART_RX", "relOffsetMm": [0, 0], "defaultNetName": "RS485_RX", "direction": "OUT" },
+    { "portName": "RS485_DE", "relOffsetMm": [0, -2.54], "defaultNetName": "RS485_DE", "direction": "IN" },
+    { "portName": "VCC_ISO", "relOffsetMm": [15.24, 12.70], "defaultNetName": "VCC_ISO_3V3", "direction": "POWER" },
+    { "portName": "GND_ISO", "relOffsetMm": [15.24, -12.70], "defaultNetName": "GND_ISO", "direction": "GND" },
+    { "portName": "BUS_A", "relOffsetMm": [43.18, 2.54], "defaultNetName": "RS485_A", "direction": "BIDIR" },
+    { "portName": "BUS_B", "relOffsetMm": [43.18, -2.54], "defaultNetName": "RS485_B", "direction": "BIDIR" }
+  ],
+  "antiPitfalls": [
+    "Isolated mode enforces separate GND_PRI and GND_ISO domains (ELINT-025)",
+    "Inline protection order: Connector -> PPTC -> CMC -> SM712 -> Transceiver"
+  ]
+}

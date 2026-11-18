@@ -1,0 +1,42 @@
+{
+  "blockTemplateId": "BLK_PWR_REVERSE_PMOS",
+  "nameZh": "高边 PMOS 零压降防反接保护积木",
+  "descriptionZh": "高边 P-MOS 漏极(D)接外部输入、源极(S)接板内系统负载（体二极管顺向导通），栅极配下拉电阻；输入超过 12V 自动挂载 12V 稳压管保护栅源极。",
+  "category": "DCDC_POWER_STAGE",
+  "parametersSchema": {
+    "type": "object",
+    "properties": {
+      "v_in_max": { "type": "number", "default": 12.0 },
+      "i_max": { "type": "number", "default": 3.0 }
+    }
+  },
+  "defaultParameters": {
+    "v_in_max": 12.0,
+    "i_max": 3.0
+  },
+  "components": [
+    { "refRole": "Q_REV", "lcscId": "C15127", "defaultPackage": "SOT-23-3", "valueExpr": "AO3401A_PMOS", "relOffsetMm": [10.16, 0], "rotationDeg": 0, "mandatory": true },
+    { "refRole": "R_GS", "lcscId": "C25792", "defaultPackage": "0402", "valueExpr": "47kΩ", "relOffsetMm": [10.16, -7.62], "rotationDeg": 270, "mandatory": true },
+    { "refRole": "D_ZENER_GS", "lcscId": "C173413", "defaultPackage": "SOD-123", "valueExpr": "BZT52C12_12V", "relOffsetMm": [17.78, -5.08], "rotationDeg": 90, "mandatory": false },
+    { "refRole": "C_PROT_OUT", "lcscId": "C15850", "defaultPackage": "0805", "valueExpr": "10uF", "relOffsetMm": [22.86, 0], "rotationDeg": 270, "mandatory": true }
+  ],
+  "connections": [
+    { "from": "PORT:VIN_RAW", "to": "Q_REV.3", "netRole": "VIN_RAW" },
+    { "from": "Q_REV.2", "to": "PORT:VOUT_SYS", "netRole": "VOUT_SYS" },
+    { "from": "Q_REV.2", "to": "D_ZENER_GS.1", "netRole": "VOUT_SYS" },
+    { "from": "Q_REV.2", "to": "C_PROT_OUT.1", "netRole": "VOUT_SYS" },
+    { "from": "Q_REV.1", "to": "D_ZENER_GS.2", "netRole": "PMOS_GATE" },
+    { "from": "Q_REV.1", "to": "R_GS.1", "netRole": "PMOS_GATE" },
+    { "from": "R_GS.2", "to": "PORT:GND", "netRole": "GND" },
+    { "from": "C_PROT_OUT.2", "to": "PORT:GND", "netRole": "GND" }
+  ],
+  "exposedPorts": [
+    { "portName": "VIN_RAW", "relOffsetMm": [0, 0], "defaultNetName": "VIN_RAW", "direction": "IN" },
+    { "portName": "VOUT_SYS", "relOffsetMm": [27.94, 0], "defaultNetName": "VOUT_SYS", "direction": "POWER" },
+    { "portName": "GND", "relOffsetMm": [10.16, -15.24], "defaultNetName": "GND", "direction": "GND" }
+  ],
+  "antiPitfalls": [
+    "Drain (Pin 3) MUST face VIN_RAW and Source (Pin 2) MUST face VOUT_SYS (ELINT-023)",
+    "When v_in_max > 12V, 12V Zener D_ZENER_GS automatically protects V_GS from breakdown"
+  ]
+}

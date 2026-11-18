@@ -1,0 +1,53 @@
+{
+  "blockTemplateId": "BLK_IND_RELAY_DRIVE",
+  "nameZh": "感性继电器续流保护与逻辑 NMOS 驱动积木",
+  "descriptionZh": "逻辑电平 NMOS（AO3400A）+ 串联阻尼电阻 Rg（22Ω）+ 栅源泄放电阻 Rgs（10kΩ）+ 线圈反向并联续流二极管（1N4007 阴极接正电源）+ 交流触点 MOV 灭弧。",
+  "category": "ELECTROMECH_DRIVER",
+  "parametersSchema": {
+    "type": "object",
+    "properties": {
+      "coil_voltage_v": { "type": "number", "default": 5.0 },
+      "v_drive": { "type": "number", "default": 3.3 },
+      "load_type": { "type": "string", "enum": ["DC", "AC_220V"], "default": "AC_220V" }
+    }
+  },
+  "defaultParameters": {
+    "coil_voltage_v": 5.0,
+    "v_drive": 3.3,
+    "load_type": "AC_220V"
+  },
+  "components": [
+    { "refRole": "R_G", "lcscId": "C25092", "defaultPackage": "0402", "valueExpr": "${calc.rg_recommended_ohm}Ω", "relOffsetMm": [5.08, -2.54], "rotationDeg": 0, "mandatory": true },
+    { "refRole": "R_GS", "lcscId": "C25744", "defaultPackage": "0402", "valueExpr": "${calc.rgs_bleeder_kohm}kΩ", "relOffsetMm": [7.62, -7.62], "rotationDeg": 270, "mandatory": true },
+    { "refRole": "Q_DRV", "lcscId": "C20917", "defaultPackage": "SOT-23-3", "valueExpr": "AO3400A", "relOffsetMm": [12.70, -2.54], "rotationDeg": 0, "mandatory": true },
+    { "refRole": "D_FLYBACK", "lcscId": "C14998", "defaultPackage": "SMA", "valueExpr": "1N4007", "relOffsetMm": [17.78, 5.08], "rotationDeg": 90, "mandatory": true },
+    { "refRole": "K_RELAY", "lcscId": "C189983", "defaultPackage": "RELAY-THT-5P", "valueExpr": "SRD-${coil_voltage_v}VDC", "relOffsetMm": [25.40, 2.54], "rotationDeg": 0, "mandatory": true },
+    { "refRole": "RV_MOV", "defaultPackage": "MOV-14D", "valueExpr": "14D471K", "relOffsetMm": [35.56, 2.54], "rotationDeg": 90, "mandatory": false }
+  ],
+  "connections": [
+    { "from": "PORT:CTRL_IN", "to": "R_G.1", "netRole": "CTRL_IN" },
+    { "from": "R_G.2", "to": "Q_DRV.1", "netRole": "MOS_GATE" },
+    { "from": "R_G.2", "to": "R_GS.1", "netRole": "MOS_GATE" },
+    { "from": "R_GS.2", "to": "PORT:GND", "netRole": "GND" },
+    { "from": "Q_DRV.2", "to": "PORT:GND", "netRole": "GND" },
+    { "from": "Q_DRV.3", "to": "D_FLYBACK.2", "netRole": "COIL_SW" },
+    { "from": "Q_DRV.3", "to": "K_RELAY.2", "netRole": "COIL_SW" },
+    { "from": "PORT:VCC_COIL", "to": "K_RELAY.1", "netRole": "VCC_COIL" },
+    { "from": "PORT:VCC_COIL", "to": "D_FLYBACK.1", "netRole": "VCC_COIL" },
+    { "from": "K_RELAY.3", "to": "PORT:LOAD_COM", "netRole": "LOAD_COM" },
+    { "from": "K_RELAY.5", "to": "PORT:LOAD_NO", "netRole": "LOAD_NO" },
+    { "from": "K_RELAY.3", "to": "RV_MOV.1", "netRole": "LOAD_COM" },
+    { "from": "K_RELAY.5", "to": "RV_MOV.2", "netRole": "LOAD_NO" }
+  ],
+  "exposedPorts": [
+    { "portName": "CTRL_IN", "relOffsetMm": [0, -2.54], "defaultNetName": "RELAY_CTRL", "direction": "IN" },
+    { "portName": "VCC_COIL", "relOffsetMm": [17.78, 10.16], "defaultNetName": "5V", "direction": "POWER" },
+    { "portName": "GND", "relOffsetMm": [12.70, -12.70], "defaultNetName": "GND", "direction": "GND" },
+    { "portName": "LOAD_COM", "relOffsetMm": [38.10, 5.08], "defaultNetName": "AC_L_IN", "direction": "BIDIR" },
+    { "portName": "LOAD_NO", "relOffsetMm": [38.10, 0], "defaultNetName": "AC_LOAD_OUT", "direction": "BIDIR" }
+  ],
+  "antiPitfalls": [
+    "Mandatory Rg (22 Ohm) + Rgs (10k Ohm) bleeder prevents floating gate turn-on (ELINT-022)",
+    "Anti-parallel flyback diode cathode tied to VCC_COIL, anode to Drain (ELINT-024)"
+  ]
+}

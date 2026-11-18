@@ -1,0 +1,68 @@
+{
+  "blockTemplateId": "BLK_DCDC_BUCK_SYNC",
+  "nameZh": "同步降压 DC-DC Buck 电源积木",
+  "descriptionZh": "带原厂 Layout Example 的同步 Buck（TPS54302），自动调用 dcdc_inductor_cap 与 voltage_divider 配比电感、偏置补偿输出电容与 FB 分压，含 100nF BOOT 与合规 EN 上拉。",
+  "category": "DCDC_POWER_STAGE",
+  "parametersSchema": {
+    "type": "object",
+    "properties": {
+      "v_in_range": { "type": "array", "items": { "type": "number" }, "default": [9.0, 24.0] },
+      "v_out": { "type": "number", "default": 5.0 },
+      "i_out_max": { "type": "number", "default": 2.0 },
+      "f_sw_khz": { "type": "number", "default": 400 },
+      "v_ref": { "type": "number", "default": 0.596 }
+    }
+  },
+  "defaultParameters": {
+    "v_in_range": [9.0, 24.0],
+    "v_out": 5.0,
+    "i_out_max": 2.0,
+    "f_sw_khz": 400,
+    "v_ref": 0.596
+  },
+  "components": [
+    { "refRole": "U_BUCK", "lcscId": "C96581", "defaultPackage": "SOT-23-6-EP", "valueExpr": "TPS54302", "relOffsetMm": [12.70, 0], "rotationDeg": 0, "mandatory": true },
+    { "refRole": "C_IN_BULK", "lcscId": "C15850", "defaultPackage": "0805", "valueExpr": "10uF", "relOffsetMm": [2.54, -2.54], "rotationDeg": 270, "mandatory": true },
+    { "refRole": "C_IN_HF", "lcscId": "C307331", "defaultPackage": "0402", "valueExpr": "100nF", "relOffsetMm": [5.08, -2.54], "rotationDeg": 270, "mandatory": true },
+    { "refRole": "R_EN_UP", "lcscId": "C17936", "defaultPackage": "1206", "valueExpr": "100kΩ", "relOffsetMm": [5.08, 5.08], "rotationDeg": 0, "mandatory": true },
+    { "refRole": "C_BOOT", "lcscId": "C1525", "defaultPackage": "0402", "valueExpr": "100nF", "relOffsetMm": [17.78, 7.62], "rotationDeg": 0, "mandatory": true },
+    { "refRole": "L_PWR", "lcscId": "C169395", "defaultPackage": "SMD-5040", "valueExpr": "${calc.l_uh}uH", "relOffsetMm": [22.86, 0], "rotationDeg": 0, "mandatory": true },
+    { "refRole": "R_FBT", "defaultPackage": "0402", "valueExpr": "${calc.r_top_formatted}", "relOffsetMm": [22.86, -7.62], "rotationDeg": 270, "mandatory": true },
+    { "refRole": "R_FBB", "defaultPackage": "0402", "valueExpr": "${calc.r_bot_formatted}", "relOffsetMm": [22.86, -12.70], "rotationDeg": 270, "mandatory": true },
+    { "refRole": "C_OUT_1", "lcscId": "C15850", "defaultPackage": "0805", "valueExpr": "${calc.c_out_unit_nom_uf}uF", "relOffsetMm": [30.48, 0], "rotationDeg": 270, "mandatory": true },
+    { "refRole": "C_OUT_2", "lcscId": "C15850", "defaultPackage": "0805", "valueExpr": "${calc.c_out_unit_nom_uf}uF", "relOffsetMm": [33.02, 0], "rotationDeg": 270, "mandatory": true }
+  ],
+  "connections": [
+    { "from": "PORT:VIN", "to": "C_IN_BULK.1", "netRole": "VIN" },
+    { "from": "PORT:VIN", "to": "C_IN_HF.1", "netRole": "VIN" },
+    { "from": "PORT:VIN", "to": "U_BUCK.3", "netRole": "VIN" },
+    { "from": "PORT:VIN", "to": "R_EN_UP.1", "netRole": "VIN" },
+    { "from": "R_EN_UP.2", "to": "U_BUCK.5", "netRole": "BUCK_EN" },
+    { "from": "U_BUCK.6", "to": "C_BOOT.1", "netRole": "BUCK_BOOT" },
+    { "from": "U_BUCK.2", "to": "C_BOOT.2", "netRole": "BUCK_SW" },
+    { "from": "U_BUCK.2", "to": "L_PWR.1", "netRole": "BUCK_SW" },
+    { "from": "L_PWR.2", "to": "C_OUT_1.1", "netRole": "VOUT" },
+    { "from": "L_PWR.2", "to": "C_OUT_2.1", "netRole": "VOUT" },
+    { "from": "L_PWR.2", "to": "R_FBT.1", "netRole": "VOUT" },
+    { "from": "L_PWR.2", "to": "PORT:VOUT", "netRole": "VOUT" },
+    { "from": "R_FBT.2", "to": "U_BUCK.4", "netRole": "BUCK_FB" },
+    { "from": "R_FBB.1", "to": "U_BUCK.4", "netRole": "BUCK_FB" },
+    { "from": "R_FBB.2", "to": "PORT:GND", "netRole": "GND" },
+    { "from": "U_BUCK.1", "to": "PORT:GND", "netRole": "GND" },
+    { "from": "U_BUCK.EP", "to": "PORT:GND", "netRole": "GND" },
+    { "from": "C_IN_BULK.2", "to": "PORT:GND", "netRole": "GND" },
+    { "from": "C_IN_HF.2", "to": "PORT:GND", "netRole": "GND" },
+    { "from": "C_OUT_1.2", "to": "PORT:GND", "netRole": "GND" },
+    { "from": "C_OUT_2.2", "to": "PORT:GND", "netRole": "GND" }
+  ],
+  "exposedPorts": [
+    { "portName": "VIN", "relOffsetMm": [0, 0], "defaultNetName": "VIN", "direction": "POWER" },
+    { "portName": "VOUT", "relOffsetMm": [38.10, 0], "defaultNetName": "VOUT_5V", "direction": "POWER" },
+    { "portName": "GND", "relOffsetMm": [12.70, -17.78], "defaultNetName": "GND", "direction": "GND" }
+  ],
+  "antiPitfalls": [
+    "Inductor Isat >= max(1.3*Ipeak, 1.1*Iocp) verified deterministically",
+    "Output MLCC DC-bias derating compensated automatically",
+    "FB divider calculated with I_FB offset and tapped after last COUT"
+  ]
+}

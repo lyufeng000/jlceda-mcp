@@ -12,9 +12,11 @@ temp/
 tmp/
 .tmp/
 
-# REA / CESM SQLite caches (keep schemas, blocks, src, tests, and adapter_bindings JSON)
+# REA / CESM SQLite caches & local auto-configured paths (keep schemas, blocks, src, tests, and adapter_bindings JSON)
 catalog/*.sqlite*
+catalog/layout_examples/
 !catalog/adapter_bindings*.json
+.jlceda-mcp.json
 
 # Keep core repository directories tracked
 !schemas/
