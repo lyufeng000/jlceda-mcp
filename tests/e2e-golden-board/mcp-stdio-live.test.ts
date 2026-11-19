@@ -106,9 +106,10 @@ describe("E2E: @modelcontextprotocol/sdk Stdio MCP Server Live Integration", () 
     expect(instructions).toContain("jlc_document_close");
   });
 
-  it("registers all 41 tools matching JLC_TOOL_NAMES.all with complete JSON schemas", async () => {
+  it("registers all 43 tools matching JLC_TOOL_NAMES.all with complete JSON schemas", async () => {
     const listed = await client.listTools();
-    expect(listed.tools).toHaveLength(41);
+    expect(listed.tools).toHaveLength(JLC_TOOL_NAMES.all.length);
+    expect(listed.tools).toHaveLength(43);
     const listedNames = listed.tools.map((t) => t.name);
     expect(listedNames).toEqual([...JLC_TOOL_NAMES.all]);
 
@@ -266,5 +267,56 @@ describe("E2E: @modelcontextprotocol/sdk Stdio MCP Server Live Integration", () 
 
     // Ensure logs go to stderr and never broke stdout JSON-RPC transport
     expect(stderrChunks.join("")).toContain("[jlceda-mcp] MCP Server started on stdio");
+  });
+
+  it("supports jlc_configure auto-detect, invalid-path user prompt, and missing-path NEED_USER_INPUT flow", async () => {
+    const tmpCfg = path.join(tempStateDir, "custom-jlceda-mcp.json");
+
+    // 1. Auto-detect local JLCEDA Pro and persist to custom config path
+    const autoCfg = parseToolEnvelope<{
+      status: string;
+      configuredBy: string;
+      clientInstalled: boolean;
+      paths: { installDir: string | null; exePath: string | null };
+    }>(
+      await client.callTool({
+        name: "jlc_configure",
+        arguments: { autoDetect: true, workspaceConfigPath: tmpCfg },
+      })
+    );
+    expect(autoCfg.ok).toBe(true);
+    expect(autoCfg.data?.status).toBe("CONFIGURED");
+    expect(autoCfg.data?.configuredBy).toBe("auto_detect");
+    expect(autoCfg.data?.clientInstalled).toBe(true);
+    expect(fs.existsSync(tmpCfg)).toBe(true);
+
+    // 2. Invalid path rejects cleanly and asks user for input
+    const badCfg = parseToolEnvelope<{ status: string; promptForUser: string }>(
+      await client.callTool({
+        name: "jlc_configure",
+        arguments: {
+          installDirOrExePath: path.join(tempStateDir, "does-not-exist"),
+          workspaceConfigPath: tmpCfg,
+        },
+      })
+    );
+    expect(badCfg.ok).toBe(false);
+    expect(badCfg.errorCode).toBe("ERR_INVALID_CLIENT_PATH");
+    expect(badCfg.data?.status).toBe("NEED_USER_INPUT");
+
+    // 3. No path + autoDetect=false returns ERR_CLIENT_PATH_REQUIRED waiting for user input
+    const needInput = parseToolEnvelope<{ status: string; promptForUser: string }>(
+      await client.callTool({
+        name: "jlc_configure",
+        arguments: {
+          autoDetect: false,
+          workspaceConfigPath: tmpCfg,
+        },
+      })
+    );
+    expect(needInput.ok).toBe(false);
+    expect(needInput.errorCode).toBe("ERR_CLIENT_PATH_REQUIRED");
+    expect(needInput.data?.status).toBe("NEED_USER_INPUT");
+    expect(needInput.data?.promptForUser.length).toBeGreaterThan(5);
   });
 });

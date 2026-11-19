@@ -5,6 +5,8 @@ import path from "node:path";
 import type {
   CdpConnectOptions,
   CdpConnectResult,
+  CdpLaunchOptions,
+  CdpLaunchResult,
   CdpProcessInfo,
   CdpTargetDescriptor,
   CollaborationMode,
@@ -738,7 +740,179 @@ export class CdpTargetRouter implements ICdpSessionManager {
   private lastKnownInstances: CdpProcessInfo[] = [];
 
   constructor(options: CdpSessionManagerOptions = {}) {
-    this.options = options;
+    this.options = { ...options };
+  }
+
+  /**
+   * Hot-update client executable, profile paths, or CDP port range at runtime
+   * (used by `jlc_configure` so users don't have to restart the MCP server).
+   */
+  public updateRuntimeOptions(patch: {
+    exePath?: string | null;
+    defaultUserDataDir?: string | null;
+    headlessProfileDir?: string | null;
+    portRange?: [number, number];
+  }): void {
+    if ("exePath" in patch) {
+      this.options.exePath = patch.exePath;
+    }
+    if ("defaultUserDataDir" in patch) {
+      this.options.defaultUserDataDir = patch.defaultUserDataDir;
+    }
+    if ("headlessProfileDir" in patch) {
+      this.options.headlessProfileDir = patch.headlessProfileDir;
+    }
+    if (patch.portRange !== undefined) {
+      this.options.portRange = patch.portRange;
+    }
+  }
+
+  /**
+   * Launch JLCEDA Pro with strictly whitelisted CDP flags, or reuse an existing CDP instance.
+   * Never kills a user's non-CDP instance.
+   */
+  public async launchClient(options: CdpLaunchOptions = {}): Promise<CdpLaunchResult> {
+    const exePath = this.options.exePath ?? null;
+    if (!exePath) {
+      return {
+        launched: false,
+        alreadyRunning: false,
+        pid: null,
+        exePath: null,
+        cdpPort: null,
+        cdpReady: false,
+        activationRequired: false,
+        launchArgs: [],
+        errorCode: "ERR_CLIENT_PATH_REQUIRED",
+        message:
+          "未配置嘉立创EDA 专业版路径。请先调用 jlc_configure 自动扫描或输入安装路径。",
+      };
+    }
+
+    const win32Scanner = this.options.win32Scanner ?? scanLcedaWin32State;
+    const win32Snap = await win32Scanner(this.options.win32ScanOptions);
+    const discovered = await this.discoverEndpoints(
+      win32Snap.processes,
+      options.cdpPort ?? undefined
+    );
+
+    // 1. Reuse existing CDP-enabled instance unless caller explicitly requests a new/isolated one
+    if (
+      discovered.endpoints.length > 0 &&
+      !options.forceNewInstance &&
+      !options.isolatedHeadless
+    ) {
+      const existing =
+        (options.cdpPort
+          ? discovered.endpoints.find((e) => e.port === options.cdpPort)
+          : undefined) ?? discovered.endpoints[0];
+      const matchedProc = win32Snap.processes.find((p) => p.cdpPort === existing.port);
+      const activationRequired =
+        existing.targets.length > 0 &&
+        existing.targets.every((t) => isUnactivatedUrl(t.url) || isIgnoredTarget(t)) &&
+        existing.targets.some((t) => isUnactivatedUrl(t.url));
+      return {
+        launched: false,
+        alreadyRunning: true,
+        pid: matchedProc?.pid ?? null,
+        exePath,
+        cdpPort: existing.port,
+        cdpReady: true,
+        activationRequired,
+        launchArgs: [],
+        message: activationRequired
+          ? `嘉立创EDA 专业版已在运行（CDP 端口 ${existing.port}），当前停留在首次登录/激活界面，请在软件窗口内完成登录激活。`
+          : `嘉立创EDA 专业版已在运行（CDP 端口 ${existing.port}），可直接调用 jlc_connect 连接。`,
+      };
+    }
+
+    // 2. Existing non-CDP instance detected and caller did not ask for isolatedHeadless/forceNewInstance
+    if (
+      discovered.endpoints.length === 0 &&
+      win32Snap.processes.length > 0 &&
+      !options.isolatedHeadless &&
+      !options.forceNewInstance
+    ) {
+      return {
+        launched: false,
+        alreadyRunning: true,
+        pid: win32Snap.processes[0]?.pid ?? null,
+        exePath,
+        cdpPort: null,
+        cdpReady: false,
+        activationRequired: false,
+        launchArgs: [],
+        errorCode: "ERR_INSTANCE_WITHOUT_CDP",
+        message:
+          "检测到嘉立创EDA 专业版已在运行但未开启 CDP 调试端口。为保护未保存工程，未强行关闭现有窗口；请关闭现有窗口后重试，或传 isolatedHeadless=true 使用独立配置并行拉起。",
+      };
+    }
+
+    // 3. Allocate port and spawn with strictly whitelisted flags
+    const [startPort, endPort] = this.options.portRange ?? [
+      DEFAULT_CDP_PORT_START,
+      DEFAULT_CDP_PORT_END,
+    ];
+    const occupiedPorts = new Set(discovered.endpoints.map((e) => e.port));
+    let port = options.cdpPort ?? startPort;
+    if (!options.cdpPort) {
+      while (occupiedPorts.has(port) && port <= endPort) {
+        port++;
+      }
+    }
+
+    const args = buildLcedaLaunchArgs({
+      cdpPort: port,
+      userDataDir: options.isolatedHeadless
+        ? this.options.headlessProfileDir ?? undefined
+        : undefined,
+    });
+
+    const spawner = this.options.processSpawner ?? defaultProcessSpawner;
+    const child = spawner(exePath, args);
+    const pid = typeof child.pid === "number" && child.pid > 0 ? child.pid : null;
+    if (pid !== null) {
+      this.launchedByMcpPids.add(pid);
+    }
+
+    const waitMs = Math.max(500, Math.min(options.waitForCdpMs ?? 10000, 30000));
+    const fetcher = this.options.httpFetcher ?? defaultHttpJsonFetch;
+    const deadline = Date.now() + waitMs;
+    let cdpReady = false;
+    let activationRequired = false;
+
+    while (Date.now() < deadline) {
+      try {
+        const raw = await fetcher(port, "/json/list", 400);
+        if (Array.isArray(raw)) {
+          cdpReady = true;
+          const targets = raw as RawCdpTarget[];
+          activationRequired =
+            targets.length > 0 &&
+            targets.some((t) => isUnactivatedUrl(t.url)) &&
+            targets.every((t) => isUnactivatedUrl(t.url) || isIgnoredTarget(t));
+          break;
+        }
+      } catch {
+        await new Promise((r) => setTimeout(r, 150));
+      }
+    }
+
+    return {
+      launched: true,
+      alreadyRunning: false,
+      pid,
+      exePath,
+      cdpPort: port,
+      cdpReady,
+      activationRequired,
+      launchArgs: args,
+      message: !cdpReady
+        ? `已启动嘉立创EDA 专业版（PID=${pid ?? "unknown"}），但 CDP 端口 ${port} 在 ${waitMs}ms 内尚未就绪，可稍后调用 jlc_connect。`
+        : activationRequired
+          ? `已启动嘉立创EDA 专业版（PID=${pid ?? "unknown"}，CDP 端口 ${port}），当前停留在首次登录/激活界面，请在软件窗口完成登录激活后再调用 jlc_connect。`
+          : `已成功启动嘉立创EDA 专业版（PID=${pid ?? "unknown"}，CDP 端口 ${port}）。`,
+    };
   }
 
   public isConnected(): boolean {

@@ -1774,3 +1774,69 @@ describe("cdp-core: ⑤ Double-Precision Unit Conversion & pngjs Side-by-Side HU
     await router.disconnect();
   });
 });
+
+describe("cdp-core: ⑥ jlc_configure hot-update & jlc_launch client launcher", () => {
+  it("returns ERR_CLIENT_PATH_REQUIRED when exePath is missing, hot-updates via updateRuntimeOptions, and launches with strictly whitelisted flags", async () => {
+    const router = new CdpTargetRouter({
+      exePath: null,
+      win32Scanner: async () => ({
+        processes: [],
+        windows: [],
+        modalDialogs: [],
+        timedOut: false,
+      }),
+    });
+
+    const missingRes = await router.launchClient();
+    expect(missingRes.launched).toBe(false);
+    expect(missingRes.errorCode).toBe("ERR_CLIENT_PATH_REQUIRED");
+
+    const spawned: Array<{ exe: string; args: string[] }> = [];
+    const customRouter = new CdpTargetRouter({
+      exePath: null,
+      portRange: [19260, 19265],
+      win32Scanner: async () => ({
+        processes: [],
+        windows: [],
+        modalDialogs: [],
+        timedOut: false,
+      }),
+      processSpawner: (exe, args) => {
+        spawned.push({ exe, args });
+        return { pid: 42424 };
+      },
+      httpFetcher: async (_port, endpoint) => {
+        if (spawned.length === 0) {
+          throw new Error("not listening yet");
+        }
+        if (endpoint === "/json/list") {
+          return [
+            {
+              id: "t-reg",
+              type: "page",
+              title: "Regist",
+              url: "https://client/editor?entry=regist",
+            },
+          ];
+        }
+        return {};
+      },
+    });
+
+    customRouter.updateRuntimeOptions({
+      exePath: "D:\\Program Files\\Development Tools\\lceda-pro\\lceda-pro.exe",
+    });
+
+    const launchRes = await customRouter.launchClient({ waitForCdpMs: 1500 });
+    expect(launchRes.launched).toBe(true);
+    expect(launchRes.alreadyRunning).toBe(false);
+    expect(launchRes.pid).toBe(42424);
+    expect(launchRes.cdpPort).toBe(19260);
+    expect(launchRes.cdpReady).toBe(true);
+    expect(launchRes.activationRequired).toBe(true);
+    expect(spawned).toHaveLength(1);
+    for (const flag of FORBIDDEN_LCEDA_FLAGS) {
+      expect(spawned[0].args.some((a) => a.startsWith(flag))).toBe(false);
+    }
+  });
+});

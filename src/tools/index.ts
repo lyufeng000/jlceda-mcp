@@ -31,7 +31,7 @@ export const TOOL_HANDLER_MAP: ReadonlyMap<JlcToolName, McpToolHandler> = new Ma
   ALL_JLC_TOOLS.map((t) => [t.name, t])
 );
 
-// Strict compile-time & startup invariant assertion: exactly 41 tools matching JLC_TOOL_NAMES.all
+// Strict compile-time & startup invariant assertion: all registered tools must match JLC_TOOL_NAMES.all
 (function assertToolRegistryAlignment(): void {
   const registeredNames = ALL_JLC_TOOLS.map((t) => t.name);
   const expectedNames = [...JLC_TOOL_NAMES.all];

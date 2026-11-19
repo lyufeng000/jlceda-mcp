@@ -10,9 +10,9 @@
 4. **五层确定性电气工程引擎 (`src/electrical/` + `src/linters/`)**：CESM 数据手册真值模型（含原厂 `Layout Example`）、9 大确定性计算器、9 大黄金子电路积木、无头 SPICE/MNA 仿真、28 条原理图电气审计（`ELINT-001~028`，100% 唯一采信 `eda.sch_Netlist`）。
 5. **模块化布局与四级布线/审计 (`src/layout-routing/` + `src/linters/`)**：Leiden 网表预聚类、四阶段无碰撞布局、第 1~3 级关键布线/FreeRouting/防立碑铺铜缝合、18 条 2.5D 计算几何 Linter（`PLINT-01~18`）与四合一总门禁 `jlc_validate`。
 
-## 6 层 41 个 MCP 工具清单
+## 6 层 43 个 MCP 工具清单
 
-- **第 1 层（会话、文档、选择集与句柄管理，14 个）**：`jlc_connect`, `jlc_session_status`, `jlc_capabilities`, `jlc_documents`, `jlc_document_new`, `jlc_document_open`, `jlc_document_activate`, `jlc_document_save`, `jlc_document_close`, `jlc_select`, `jlc_reference_create`, `jlc_reference_resolve`, `jlc_array_read`, `jlc_transaction`
+- **第 1 层（路径配置、启动、会话、文档、选择集与句柄管理，16 个）**：`jlc_configure`, `jlc_launch`, `jlc_connect`, `jlc_session_status`, `jlc_capabilities`, `jlc_documents`, `jlc_document_new`, `jlc_document_open`, `jlc_document_activate`, `jlc_document_save`, `jlc_document_close`, `jlc_select`, `jlc_reference_create`, `jlc_reference_resolve`, `jlc_array_read`, `jlc_transaction`
 - **第 2 层（通用动态反射，3 个）**：`jlc_api_search`, `jlc_api_describe`, `jlc_api_invoke`
 - **第 3 层（器件库、Datasheet 解析与确定性计算，5 个）**：`jlc_lib_search`, `jlc_lib_device_inspect`, `jlc_datasheet_extract`, `jlc_lib_custom_create`, `jlc_elec_calc`
 - **第 4 层（原理图操作、标准积木与 SPICE 仿真，7 个）**：`jlc_sch_sheet_manage`, `jlc_sch_component_place`, `jlc_sch_block_instantiate`, `jlc_sch_wire_connect`, `jlc_sch_netlist_query`, `jlc_spice_run`, `jlc_sch_sync_to_pcb`

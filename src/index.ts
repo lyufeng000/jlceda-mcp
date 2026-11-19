@@ -183,7 +183,7 @@ async function main(): Promise<void> {
   process.on("SIGTERM", () => void shutdown("SIGTERM"));
 
   await server.connect(transport);
-  console.error("[jlceda-mcp] MCP Server started on stdio (41 tools registered).");
+  console.error(`[jlceda-mcp] MCP Server started on stdio (${ALL_JLC_TOOLS.length} tools registered).`);
 }
 
 const isMain =

@@ -15,9 +15,18 @@ import {
   encodePersistentReference,
   type PersistentRefCandidate,
 } from "../cdp/handle-pool.js";
+import { writeWorkspaceMcpConfig } from "../env/info-config.js";
+import {
+  isValidClientInstallDir,
+  normalizeCandidateInstallDir,
+  resolveClientEnvironment,
+} from "../env/path-resolver.js";
+import { buildReaCatalog } from "../rea/catalog-builder.js";
 import { generateSpecctraDsn, parseSpecctraSes } from "../layout-routing/freerouting-driver.js";
 import {
+  WORKSPACE_ROOT,
   compileSchematicNetlist,
+  enrichEnvCatalogStats,
   getWorkspaceState,
   type WorkspaceDocument,
 } from "./state.js";
@@ -154,6 +163,310 @@ function writeGerberBundle(doc: WorkspaceDocument, outDir: string): { files: str
   }
   return { files, totalBytes };
 }
+
+export const jlcConfigureTool: McpToolHandler = {
+  name: "jlc_configure",
+  layer: 1,
+  description:
+    "配置或自动探测嘉立创EDA 专业版路径。不传 installDirOrExePath 时先自动扫描默认安装路径/注册表/快捷方式/常见盘符；若未找到则返回 status='NEED_USER_INPUT'（ERR_CLIENT_PATH_REQUIRED）等待要求用户输入路径；校验通过后持久化至工作区 .jlceda-mcp.json 并立即热更新当前 MCP 会话。",
+  inputSchema: {
+    type: "object",
+    properties: {
+      installDirOrExePath: {
+        type: ["string", "null"],
+        default: null,
+        description:
+          "嘉立创EDA 专业版安装目录（如 D:\\Program Files\\Development Tools\\lceda-pro）或 lceda-pro.exe 完整路径；留空时自动扫描默认安装路径。",
+      },
+      autoDetect: {
+        type: "boolean",
+        default: true,
+        description: "未传 installDirOrExePath 时是否先执行自动路径扫描。",
+      },
+      dataDir: { type: ["string", "null"], default: null },
+      cdpPort: { type: ["integer", "null"], default: null },
+      freeroutingJarPath: { type: ["string", "null"], default: null },
+      ngspiceExePath: { type: ["string", "null"], default: null },
+      rebuildIndex: {
+        type: "boolean",
+        default: false,
+        description: "配置成功后是否立即重建 REA 无伪源码接口索引。",
+      },
+      workspaceConfigPath: {
+        type: ["string", "null"],
+        default: null,
+        description: "可选自定义配置文件写入路径（默认工作区 .jlceda-mcp.json）。",
+      },
+      skipSystemProbes: {
+        type: "boolean",
+        default: false,
+        description: "可选跳过系统进程/注册表探测（用于测试或受限环境）。",
+      },
+    },
+  },
+  async execute(args, context) {
+    const state = getWorkspaceState(context);
+    const rawInput =
+      typeof args.installDirOrExePath === "string" && args.installDirOrExePath.trim().length > 0
+        ? args.installDirOrExePath.trim()
+        : null;
+    const autoDetect = args.autoDetect !== false;
+    const configPath =
+      typeof args.workspaceConfigPath === "string" && args.workspaceConfigPath.trim().length > 0
+        ? path.resolve(args.workspaceConfigPath.trim())
+        : path.join(WORKSPACE_ROOT, ".jlceda-mcp.json");
+
+    let candidateDir: string | null = null;
+    if (rawInput) {
+      candidateDir = normalizeCandidateInstallDir(rawInput);
+      if (!isValidClientInstallDir(candidateDir)) {
+        return errEnvelope(
+          "ERR_INVALID_CLIENT_PATH",
+          `路径 '${rawInput}' 不是有效的嘉立创EDA 专业版目录（需包含 lceda-pro.exe 及 resources/app.asar 或 resources/app/package.json）。请核对后重新输入。`,
+          {
+            data: {
+              status: "NEED_USER_INPUT",
+              providedPath: rawInput,
+              normalizedDir: candidateDir,
+              promptForUser:
+                "请输入正确的嘉立创EDA 专业版安装目录（包含 lceda-pro.exe）或 lceda-pro.exe 完整路径。",
+            },
+          }
+        );
+      }
+    } else if (autoDetect) {
+      const probed = await resolveClientEnvironment({
+        workspaceRoot: WORKSPACE_ROOT,
+        workspaceConfigPath: configPath,
+        skipSystemProbes: args.skipSystemProbes === true,
+      });
+      if (probed.clientInstalled && probed.paths.installDir) {
+        candidateDir = probed.paths.installDir;
+      }
+    }
+
+    if (!candidateDir) {
+      return errEnvelope(
+        "ERR_CLIENT_PATH_REQUIRED",
+        "未在默认安装路径或系统注册表中检测到嘉立创EDA 专业版，请要求用户输入安装目录（例如 D:\\Program Files\\Development Tools\\lceda-pro）或 lceda-pro.exe 完整路径后重新调用 jlc_configure。",
+        {
+          data: {
+            status: "NEED_USER_INPUT",
+            clientInstalled: false,
+            configPath,
+            promptForUser:
+              "未在默认安装路径扫描到嘉立创EDA 专业版，请输入您的嘉立创EDA 专业版安装目录或 lceda-pro.exe 完整路径。",
+          },
+        }
+      );
+    }
+
+    // Resolve full environment with the validated/detected installDir
+    const exePath = path.join(candidateDir, "lceda-pro.exe");
+    const customEnv: NodeJS.ProcessEnv = {
+      ...process.env,
+      JLCEDA_PRO_INSTALL_DIR: candidateDir,
+      JLCEDA_PRO_EXE_PATH: exePath,
+    };
+    if (typeof args.dataDir === "string" && args.dataDir.trim()) {
+      customEnv.JLCEDA_PRO_DATA_DIR = args.dataDir.trim();
+    }
+    if (typeof args.cdpPort === "number" && Number.isInteger(args.cdpPort)) {
+      customEnv.JLCEDA_PRO_CDP_PORT = String(args.cdpPort);
+    }
+    if (typeof args.freeroutingJarPath === "string" && args.freeroutingJarPath.trim()) {
+      customEnv.FREEROUTING_JAR_PATH = args.freeroutingJarPath.trim();
+    }
+    if (typeof args.ngspiceExePath === "string" && args.ngspiceExePath.trim()) {
+      customEnv.NGSPICE_EXE_PATH = args.ngspiceExePath.trim();
+    }
+
+    let envInfo = enrichEnvCatalogStats(
+      await resolveClientEnvironment({
+        workspaceRoot: WORKSPACE_ROOT,
+        workspaceConfigPath: configPath,
+        env: customEnv,
+        skipSystemProbes: true,
+      })
+    );
+
+    const persistedPayload = {
+      jlceda_pro: {
+        JLCEDA_PRO_INSTALL_DIR: envInfo.paths.installDir ?? candidateDir,
+        JLCEDA_PRO_EXE_PATH: envInfo.paths.exePath ?? exePath,
+        JLCEDA_PRO_ASAR_PATH: envInfo.paths.asarPath ?? "",
+        JLCEDA_PRO_DATA_DIR: envInfo.paths.dataDir ?? "",
+        JLCEDA_PRO_USER_DATA_DIR: envInfo.paths.userDataDir ?? "",
+        JLCEDA_PRO_CDP_PORT: envInfo.paths.cdpPort,
+        JLCEDA_MCP_INDEX_DIR: envInfo.paths.indexDir,
+        JLCEDA_MCP_TEMP_DIR: envInfo.paths.tempDir,
+        FREEROUTING_JAR_PATH: envInfo.paths.freeroutingJarPath ?? "",
+        NGSPICE_EXE_PATH: envInfo.paths.ngspiceExePath ?? "",
+        configuredAt: new Date().toISOString(),
+        configuredBy: rawInput ? "user_input" : "auto_detect",
+      },
+    };
+    writeWorkspaceMcpConfig(configPath, persistedPayload);
+
+    let indexRebuilt = false;
+    if (args.rebuildIndex === true && envInfo.paths.asarPath) {
+      buildReaCatalog({
+        sourcePath: envInfo.paths.asarPath,
+        outputDir: envInfo.paths.indexDir,
+        workspaceRoot: WORKSPACE_ROOT,
+      });
+      indexRebuilt = true;
+      envInfo = enrichEnvCatalogStats(envInfo);
+    }
+
+    // Hot-update live MCP session & CDP router
+    state.envInfo = envInfo;
+    context.envInfo = envInfo;
+    context.sessionManager.updateRuntimeOptions?.({
+      exePath: envInfo.paths.exePath,
+      defaultUserDataDir: envInfo.paths.userDataDir,
+      headlessProfileDir: envInfo.paths.headlessProfileDir,
+      portRange: [envInfo.paths.cdpPort, envInfo.paths.cdpPort + 7],
+    });
+
+    return okEnvelope({
+      status: "CONFIGURED",
+      configuredBy: rawInput ? "user_input" : "auto_detect",
+      configPath,
+      clientInstalled: envInfo.clientInstalled,
+      clientVersion: envInfo.clientVersion,
+      indexRebuilt,
+      paths: envInfo.paths,
+      catalogStats: envInfo.catalogStats,
+    });
+  },
+};
+
+export const jlcLaunchTool: McpToolHandler = {
+  name: "jlc_launch",
+  layer: 1,
+  description:
+    "打开（启动）本机嘉立创EDA 专业版客户端（自动附加合规 CDP 调试参数，不强杀已有用户窗口）。若尚未配置路径会先自动扫描默认安装路径，未找到时返回 ERR_CLIENT_PATH_REQUIRED 提示先调用 jlc_configure。",
+  inputSchema: {
+    type: "object",
+    properties: {
+      cdpPort: {
+        type: ["integer", "null"],
+        default: null,
+        description: "优先使用的本地回环 CDP 端口（默认采用已配置的端口 19222）。",
+      },
+      isolatedHeadless: {
+        type: "boolean",
+        default: false,
+        description: "是否使用独立隔离 Profile 并行拉起新实例。",
+      },
+      forceNewInstance: {
+        type: "boolean",
+        default: false,
+        description: "已有运行中的 CDP 实例时是否强制再开一个新实例（默认 false 直接复用）。",
+      },
+      autoConnect: {
+        type: "boolean",
+        default: true,
+        description: "启动且已激活时是否自动建立 CDP 会话连接。",
+      },
+      waitForCdpMs: {
+        type: "integer",
+        default: 10000,
+        description: "等待 CDP 调试端口就绪的超时毫秒数（500~30000）。",
+      },
+    },
+  },
+  async execute(args, context) {
+    const state = getWorkspaceState(context);
+    let envInfo = await state.ensureEnvInfo(context);
+    if (!envInfo.clientInstalled || !envInfo.paths.exePath) {
+      envInfo = enrichEnvCatalogStats(
+        await resolveClientEnvironment({ workspaceRoot: WORKSPACE_ROOT })
+      );
+      state.envInfo = envInfo;
+      context.envInfo = envInfo;
+    }
+
+    if (!envInfo.clientInstalled || !envInfo.paths.exePath) {
+      return errEnvelope(
+        "ERR_CLIENT_PATH_REQUIRED",
+        "未检测到嘉立创EDA 专业版安装路径，无法启动软件。请先调用 jlc_configure 自动扫描或让用户输入安装路径。",
+        {
+          data: {
+            status: "NEED_USER_INPUT",
+            clientInstalled: false,
+            promptForUser:
+              "请提供嘉立创EDA 专业版的安装目录或 lceda-pro.exe 完整路径。",
+          },
+        }
+      );
+    }
+
+    context.sessionManager.updateRuntimeOptions?.({
+      exePath: envInfo.paths.exePath,
+      defaultUserDataDir: envInfo.paths.userDataDir,
+      headlessProfileDir: envInfo.paths.headlessProfileDir,
+      portRange: [envInfo.paths.cdpPort, envInfo.paths.cdpPort + 7],
+    });
+
+    if (typeof context.sessionManager.launchClient !== "function") {
+      return errEnvelope(
+        "ERR_LAUNCH_UNSUPPORTED",
+        "Current session manager does not implement launchClient()."
+      );
+    }
+
+    const launchRes = await context.sessionManager.launchClient({
+      cdpPort: typeof args.cdpPort === "number" ? args.cdpPort : envInfo.paths.cdpPort,
+      isolatedHeadless: args.isolatedHeadless === true,
+      forceNewInstance: args.forceNewInstance === true,
+      waitForCdpMs: typeof args.waitForCdpMs === "number" ? args.waitForCdpMs : 10000,
+    });
+
+    if (!launchRes.launched && !launchRes.alreadyRunning) {
+      return errEnvelope(
+        launchRes.errorCode ?? "ERR_LAUNCH_FAILED",
+        launchRes.message ?? "Failed to launch JLCEDA Pro.",
+        { data: launchRes }
+      );
+    }
+
+    if (launchRes.errorCode === "ERR_INSTANCE_WITHOUT_CDP") {
+      return errEnvelope(
+        "ERR_INSTANCE_WITHOUT_CDP",
+        launchRes.message ?? "Existing JLCEDA Pro instance has no CDP port enabled.",
+        { data: launchRes }
+      );
+    }
+
+    let connectResult: Awaited<ReturnType<typeof context.sessionManager.connect>> | null = null;
+    if (
+      args.autoConnect !== false &&
+      launchRes.cdpReady &&
+      !launchRes.activationRequired &&
+      launchRes.cdpPort !== null
+    ) {
+      try {
+        connectResult = await context.sessionManager.connect({
+          launch: false,
+          cdpPort: launchRes.cdpPort,
+        });
+      } catch {
+        connectResult = null;
+      }
+    }
+
+    return okEnvelope(
+      {
+        ...launchRes,
+        connected: Boolean(connectResult?.connected),
+        boundInstance: connectResult?.boundInstance ?? null,
+      },
+      launchRes.message
+    );
+  },
+};
 
 export const jlcConnectTool: McpToolHandler = {
   name: "jlc_connect",
@@ -986,6 +1299,8 @@ export const jlcTransactionTool: McpToolHandler = {
 };
 
 export const LAYER1_TOOLS: McpToolHandler[] = [
+  jlcConfigureTool,
+  jlcLaunchTool,
   jlcConnectTool,
   jlcSessionStatusTool,
   jlcCapabilitiesTool,

@@ -84,8 +84,8 @@ describe("E2E Phase 5: Industrial IoT Controller 4-Layer Golden Board Full Close
   });
 
   it("executes end-to-end 41-tool hardware design, error traps + self-healing, 4-layer synthesis, vision comparison, validation, and clean export", async () => {
-    // 0. Sanity: all 41 tools registered
-    expect(JLC_TOOL_NAMES.all).toHaveLength(41);
+    // 0. Sanity: all 43 tools registered
+    expect(JLC_TOOL_NAMES.all).toHaveLength(43);
 
     // 1. Layer 1: Create project, schematic sheet, PCB document & setup sheet frames
     const projRes = await invoke<{

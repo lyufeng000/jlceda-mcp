@@ -474,8 +474,35 @@ export interface ICdpRpcExecutor {
   releaseObjectGroup(objectGroup?: string): Promise<void>;
 }
 
+export interface CdpLaunchOptions {
+  cdpPort?: number | null;
+  isolatedHeadless?: boolean;
+  forceNewInstance?: boolean;
+  waitForCdpMs?: number;
+}
+
+export interface CdpLaunchResult {
+  launched: boolean;
+  alreadyRunning: boolean;
+  pid: number | null;
+  exePath: string | null;
+  cdpPort: number | null;
+  cdpReady: boolean;
+  activationRequired: boolean;
+  launchArgs: string[];
+  errorCode?: string;
+  message?: string;
+}
+
 export interface ICdpSessionManager {
   connect(options?: CdpConnectOptions): Promise<CdpConnectResult>;
+  launchClient?(options?: CdpLaunchOptions): Promise<CdpLaunchResult>;
+  updateRuntimeOptions?(patch: {
+    exePath?: string | null;
+    defaultUserDataDir?: string | null;
+    headlessProfileDir?: string | null;
+    portRange?: [number, number];
+  }): void;
   disconnect(): Promise<void>;
   isConnected(): boolean;
   getCollaborationMode(): CollaborationMode | null;
@@ -1294,10 +1321,12 @@ export interface MasterValidationReport {
 }
 
 // ============================================================================
-// 8. MCP Tool Registry (6 Layers, 41 Tools) & Handler Contract
+// 8. MCP Tool Registry (6 Layers, 43 Tools) & Handler Contract
 // ============================================================================
 
 const LAYER1_TOOL_NAMES = [
+  "jlc_configure",
+  "jlc_launch",
   "jlc_connect",
   "jlc_session_status",
   "jlc_capabilities",
