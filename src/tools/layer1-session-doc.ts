@@ -15,7 +15,10 @@ import {
   encodePersistentReference,
   type PersistentRefCandidate,
 } from "../cdp/handle-pool.js";
-import { writeWorkspaceMcpConfig } from "../env/info-config.js";
+import {
+  resolveUserGlobalConfigPath,
+  writeWorkspaceMcpConfig,
+} from "../env/info-config.js";
 import {
   isValidClientInstallDir,
   normalizeCandidateInstallDir,
@@ -168,7 +171,7 @@ export const jlcConfigureTool: McpToolHandler = {
   name: "jlc_configure",
   layer: 1,
   description:
-    "配置或自动探测嘉立创EDA 专业版路径。不传 installDirOrExePath 时先自动扫描默认安装路径/注册表/快捷方式/常见盘符；若未找到则返回 status='NEED_USER_INPUT'（ERR_CLIENT_PATH_REQUIRED）等待要求用户输入路径；校验通过后持久化至工作区 .jlceda-mcp.json 并立即热更新当前 MCP 会话。",
+    "配置或自动探测嘉立创EDA 专业版路径。不传 installDirOrExePath 时先自动扫描默认安装路径/注册表/快捷方式/常见盘符；若未找到则返回 status='NEED_USER_INPUT'（ERR_CLIENT_PATH_REQUIRED）等待要求用户输入路径；校验通过后持久化至用户级全局配置 ~/.jlceda-mcp/config.json（或自定义路径）并立即热更新当前 MCP 会话。",
   inputSchema: {
     type: "object",
     properties: {
@@ -195,7 +198,7 @@ export const jlcConfigureTool: McpToolHandler = {
       workspaceConfigPath: {
         type: ["string", "null"],
         default: null,
-        description: "可选自定义配置文件写入路径（默认工作区 .jlceda-mcp.json）。",
+        description: "可选自定义配置文件写入路径（默认用户级全局 ~/.jlceda-mcp/config.json）。",
       },
       skipSystemProbes: {
         type: "boolean",
@@ -211,10 +214,11 @@ export const jlcConfigureTool: McpToolHandler = {
         ? args.installDirOrExePath.trim()
         : null;
     const autoDetect = args.autoDetect !== false;
-    const configPath =
-      typeof args.workspaceConfigPath === "string" && args.workspaceConfigPath.trim().length > 0
-        ? path.resolve(args.workspaceConfigPath.trim())
-        : path.join(WORKSPACE_ROOT, ".jlceda-mcp.json");
+    const hasCustomConfigPath =
+      typeof args.workspaceConfigPath === "string" && args.workspaceConfigPath.trim().length > 0;
+    const configPath = hasCustomConfigPath
+      ? path.resolve((args.workspaceConfigPath as string).trim())
+      : resolveUserGlobalConfigPath();
 
     let candidateDir: string | null = null;
     if (rawInput) {
@@ -237,7 +241,8 @@ export const jlcConfigureTool: McpToolHandler = {
     } else if (autoDetect) {
       const probed = await resolveClientEnvironment({
         workspaceRoot: WORKSPACE_ROOT,
-        workspaceConfigPath: configPath,
+        workspaceConfigPath: hasCustomConfigPath ? configPath : undefined,
+        userConfigPath: hasCustomConfigPath ? null : configPath,
         skipSystemProbes: args.skipSystemProbes === true,
       });
       if (probed.clientInstalled && probed.paths.installDir) {

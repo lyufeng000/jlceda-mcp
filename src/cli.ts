@@ -6,6 +6,13 @@ import type { CompiledNetlist } from "./types/index.js";
 import { writeWorkspaceMcpConfig } from "./env/info-config.js";
 import { resolveClientEnvironment } from "./env/path-resolver.js";
 import {
+  buildHarnessRegistrationGuide,
+  formatRegistrationGuide,
+  removeHarnessMcpConfig,
+  resolveAntigravityMcpConfigPath,
+  runSetupWizard,
+} from "./env/setup-wizard.js";
+import {
   findJlcShortcuts,
   patchShortcutCdpArgs,
 } from "./env/shortcut-patcher.js";
@@ -14,6 +21,7 @@ import { loadCachedAdapterBindings } from "./rea/fingerprint-adapter.js";
 import { verifyZeroSourceCatalog } from "./rea/zero-source-verifier.js";
 import { createBuiltInCesmResolver, runElectricalLinter } from "./linters/index.js";
 import { enrichEnvCatalogStats } from "./tools/state.js";
+import { startStdioServer } from "./index.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -199,12 +207,95 @@ async function cmdLint(argv: string[]): Promise<number> {
   return report.blockerCount === 0 ? 0 : 1;
 }
 
+async function cmdSetup(argv: string[]): Promise<number> {
+  const clientDir = parseFlagValue(argv, "--client-dir") ?? null;
+  const cdpPortRaw = parseFlagValue(argv, "--cdp-port");
+  const cdpPort = cdpPortRaw ? Number.parseInt(cdpPortRaw, 10) : null;
+  const indexDir = parseFlagValue(argv, "--index-dir") ?? null;
+  const writeConfigPath = parseFlagValue(argv, "--write-config") ?? null;
+  const writeAntigravity = argv.includes("--write-antigravity");
+  const rebuildIndex = argv.includes("--rebuild-index");
+  const skipIndex = argv.includes("--skip-index");
+  const yes = argv.includes("--yes") || argv.includes("-y");
+  const jsonOutput = argv.includes("--json");
+
+  const result = await runSetupWizard({
+    workspaceRoot: WORKSPACE_ROOT,
+    clientDir,
+    cdpPort: cdpPort !== null && Number.isInteger(cdpPort) ? cdpPort : null,
+    indexDir,
+    rebuildIndex,
+    skipIndex,
+    yes,
+    writeAntigravity,
+    writeConfigPath,
+    logFn: jsonOutput ? null : (line) => console.log(line),
+  });
+
+  if (jsonOutput) {
+    console.log(JSON.stringify(result, null, 2));
+  } else if (result.ok) {
+    console.log(formatRegistrationGuide(result));
+  } else {
+    console.error(`[${result.errorCode ?? "ERR_SETUP"}] ${result.errorMessage ?? "Setup failed"}`);
+  }
+
+  return result.ok ? 0 : 1;
+}
+
+function cmdPrintConfig(argv: string[]): number {
+  const jsonOutput = argv.includes("--json");
+  const guide = buildHarnessRegistrationGuide({
+    serverEntryPath: path.join(WORKSPACE_ROOT, "dist", "index.js"),
+  });
+
+  if (jsonOutput) {
+    console.log(JSON.stringify(guide, null, 2));
+    return 0;
+  }
+
+  console.log("── 极简 MCP 注册片段（无需 env，路径由 ~/.jlceda-mcp/config.json 托管）──");
+  console.log(JSON.stringify(guide.mcpServersSnippet, null, 2));
+  console.log("");
+  console.log("── 主流 Harness 原生注册命令 ──");
+  console.log(`  Claude Code : ${guide.commands.claudeCode}`);
+  console.log(`  Codex       : ${guide.commands.codex}`);
+  console.log(`  Antigravity : 加入 ${guide.antigravityConfigPath}（或执行 ${guide.commands.antigravityWriteFlag}）`);
+  return 0;
+}
+
+function cmdUninstall(argv: string[]): number {
+  const targetConfig =
+    parseFlagValue(argv, "--config") ??
+    (argv.includes("--antigravity") ? resolveAntigravityMcpConfigPath() : null);
+
+  if (!targetConfig) {
+    console.error(
+      "Usage: jlceda-mcp uninstall --antigravity | --config <mcp_config.json>"
+    );
+    return 1;
+  }
+
+  const res = removeHarnessMcpConfig(targetConfig, "jlceda-pro");
+  console.log(JSON.stringify({ command: "uninstall", ...res }, null, 2));
+  return 0;
+}
+
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
   const subcommand = args[0];
 
   let code = 0;
-  if (subcommand === "doctor") {
+  if (subcommand === "setup") {
+    code = await cmdSetup(args.slice(1));
+  } else if (subcommand === "print-config") {
+    code = cmdPrintConfig(args.slice(1));
+  } else if (subcommand === "uninstall") {
+    code = cmdUninstall(args.slice(1));
+  } else if (subcommand === "serve") {
+    await startStdioServer();
+    return;
+  } else if (subcommand === "doctor") {
     code = await cmdDoctor(args.slice(1));
   } else if (subcommand === "index") {
     code = await cmdIndex(args.slice(1));
@@ -217,6 +308,10 @@ async function main(): Promise<void> {
       [
         "JLCEDA Pro MCP CLI",
         "Commands:",
+        "  setup [--client-dir <path>] [--cdp-port <port>] [--index-dir <dir>] [--rebuild-index] [--yes] [--write-antigravity] [--write-config <path>] [--json]",
+        "  print-config [--json]",
+        "  serve",
+        "  uninstall --antigravity | --config <mcp_config.json>",
         "  doctor [--auto-configure] [--patch-shortcut-cdp]",
         "  index [--source <path>] [--verify-zero-source]",
         "  calibrate-l3",

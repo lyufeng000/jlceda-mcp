@@ -32,10 +32,36 @@ export interface LoadConfigOptions {
   infoJsonPath?: string;
   workspaceRoot?: string;
   workspaceConfigPath?: string;
+  /**
+   * Optional path to user-level global config (`~/.jlceda-mcp/config.json` by default).
+   * Pass `null` to explicitly disable loading the user-level global config (e.g. isolated tests).
+   */
+  userConfigPath?: string | null;
 }
 
 const DEFAULT_CDP_PORT = 19222;
 const PLACEHOLDER_RE = /^<[A-Z0-9_]+>$/;
+
+/**
+ * Resolve the user-level global configuration directory (`~/.jlceda-mcp`).
+ */
+export function resolveUserGlobalConfigDir(homeDir: string = os.homedir()): string {
+  return path.join(homeDir, ".jlceda-mcp");
+}
+
+/**
+ * Resolve the user-level global configuration file (`~/.jlceda-mcp/config.json`).
+ */
+export function resolveUserGlobalConfigPath(homeDir: string = os.homedir()): string {
+  return path.join(resolveUserGlobalConfigDir(homeDir), "config.json");
+}
+
+/**
+ * Resolve the default user-level global API catalog directory (`~/.jlceda-mcp/catalog`).
+ */
+export function resolveDefaultGlobalCatalogDir(homeDir: string = os.homedir()): string {
+  return path.join(resolveUserGlobalConfigDir(homeDir), "catalog");
+}
 
 /**
  * Return true when a config string is unset, whitespace-only, or an unexpanded `<PLACEHOLDER>`.
@@ -157,8 +183,9 @@ export function resolveDefaultHeadlessProfileDir(): string {
 }
 
 /**
- * Load L0 environment variables, `%USERPROFILE%\information.json`, and workspace `.jlceda-mcp.json`.
- * Precedence: process env > workspace `.jlceda-mcp.json` > `~/information.json` > safe defaults.
+ * Load L0 environment variables, workspace `.jlceda-mcp.json`, user-level global
+ * `~/.jlceda-mcp/config.json`, and `%USERPROFILE%\information.json`.
+ * Precedence: process env > workspace `.jlceda-mcp.json` > `~/.jlceda-mcp/config.json` > `~/information.json` > safe defaults.
  */
 export function loadEnvAndInfoConfig(options: LoadConfigOptions = {}): EnvAndInfoConfig {
   const env = options.env ?? process.env;
@@ -167,12 +194,20 @@ export function loadEnvAndInfoConfig(options: LoadConfigOptions = {}): EnvAndInf
   const infoJsonPath = options.infoJsonPath ?? path.join(homeDir, "information.json");
   const workspaceConfigPath =
     options.workspaceConfigPath ?? path.join(workspaceRoot, ".jlceda-mcp.json");
+  const userConfigPath =
+    options.userConfigPath === undefined
+      ? resolveUserGlobalConfigPath(homeDir)
+      : options.userConfigPath;
 
   const diagnostics: string[] = [];
   const infoRaw = readJsonRecordSafe(infoJsonPath, diagnostics, "information.json");
+  const userRaw = userConfigPath
+    ? readJsonRecordSafe(userConfigPath, diagnostics, "~/.jlceda-mcp/config.json")
+    : null;
   const wsRaw = readJsonRecordSafe(workspaceConfigPath, diagnostics, ".jlceda-mcp.json");
 
   const infoSection = pickSection(infoRaw);
+  const userSection = pickSection(userRaw);
   const wsSection = pickSection(wsRaw);
 
   const pickWithPriority = (
@@ -188,6 +223,10 @@ export function loadEnvAndInfoConfig(options: LoadConfigOptions = {}): EnvAndInf
     const wsVal = pickString(wsSection, jsonKeys);
     if (wsVal !== null) {
       return { value: wsVal, source: "L0_INFO_JSON" };
+    }
+    const userVal = pickString(userSection, jsonKeys);
+    if (userVal !== null) {
+      return { value: userVal, source: "L0_INFO_JSON" };
     }
     const infoVal = pickString(infoSection, jsonKeys);
     if (infoVal !== null) {
@@ -257,6 +296,8 @@ export function loadEnvAndInfoConfig(options: LoadConfigOptions = {}): EnvAndInf
     env.JLCEDA_PRO_CDP_PORT ??
     wsSection.JLCEDA_PRO_CDP_PORT ??
     wsSection.cdpPort ??
+    userSection.JLCEDA_PRO_CDP_PORT ??
+    userSection.cdpPort ??
     infoSection.JLCEDA_PRO_CDP_PORT ??
     infoSection.cdpPort;
   const cdpPort = parsePort(cdpPortRaw, DEFAULT_CDP_PORT);
@@ -298,4 +339,17 @@ export function writeWorkspaceMcpConfig(
 ): void {
   fs.mkdirSync(path.dirname(workspaceConfigPath), { recursive: true });
   fs.writeFileSync(workspaceConfigPath, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
+}
+
+/**
+ * Persist resolved JLCEDA paths into user-level global `~/.jlceda-mcp/config.json`.
+ * Never touches `~/information.json` or any Harness configuration file.
+ */
+export function writeUserGlobalMcpConfig(
+  payload: Record<string, unknown>,
+  userConfigPath: string = resolveUserGlobalConfigPath()
+): string {
+  fs.mkdirSync(path.dirname(userConfigPath), { recursive: true });
+  fs.writeFileSync(userConfigPath, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
+  return userConfigPath;
 }

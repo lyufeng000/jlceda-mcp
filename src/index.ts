@@ -165,7 +165,7 @@ export async function createJlcMcpServer(): Promise<{
   return { server, context, cleanup };
 }
 
-async function main(): Promise<void> {
+export async function startStdioServer(): Promise<void> {
   const { server, cleanup } = await createJlcMcpServer();
   const transport = new StdioServerTransport();
 
@@ -191,7 +191,7 @@ const isMain =
   path.resolve(process.argv[1]) === path.resolve(__filename);
 
 if (isMain) {
-  main().catch((err) => {
+  startStdioServer().catch((err) => {
     console.error("[jlceda-mcp] Fatal startup error:", err);
     process.exit(1);
   });

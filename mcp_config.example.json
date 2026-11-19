@@ -4,19 +4,7 @@
       "command": "node",
       "args": [
         "<MCP_WORKSPACE_ROOT>/dist/index.js"
-      ],
-      "env": {
-        "JLCEDA_PRO_INSTALL_DIR": "<JLCEDA_PRO_INSTALL_DIR>",
-        "JLCEDA_PRO_EXE_PATH": "<JLCEDA_PRO_EXE_PATH>",
-        "JLCEDA_PRO_ASAR_PATH": "<JLCEDA_PRO_ASAR_PATH>",
-        "JLCEDA_PRO_DATA_DIR": "<JLCEDA_PRO_DATA_DIR>",
-        "JLCEDA_PRO_USER_DATA_DIR": "<JLCEDA_PRO_USER_DATA_DIR>",
-        "JLCEDA_PRO_CDP_PORT": "19222",
-        "JLCEDA_MCP_INDEX_DIR": "<JLCEDA_MCP_INDEX_DIR>",
-        "JLCEDA_MCP_TEMP_DIR": "D:\\Data\\.temp\\jlceda-mcp",
-        "FREEROUTING_JAR_PATH": "<OPTIONAL_FREEROUTING_JAR_PATH>",
-        "NGSPICE_EXE_PATH": "<OPTIONAL_NGSPICE_EXE_PATH>"
-      }
+      ]
     }
   }
 }
