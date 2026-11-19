@@ -1059,6 +1059,39 @@ export interface ConstraintHandoffPackage {
   keepoutZones25D: Keepout25DFiveTuple[];
 }
 
+export interface AuditCoverageItem {
+  area: string;
+  status: "UNCOVERED" | "DEGRADED" | "SKIPPED";
+  reason: string;
+  evidenceSource: string;
+}
+
+export interface AuditReviewRow {
+  index: number;
+  severity: "BLOCKER" | "WARNING" | "INFO";
+  ruleId: string;
+  category: string;
+  issue: string;
+  netAndRef: string;
+  layer: string;
+  evidence: string;
+  duplicateCount: number;
+  foldedCount?: number;
+  sampleRefs?: string[];
+}
+
+export interface AuditNormalizedSummary {
+  rawCount: number;
+  dedupedCount: number;
+  displayedRowCount: number;
+  blockerCount: number;
+  warningCount: number;
+  infoCount: number;
+  foldedGroupCount: number;
+  groupThreshold: number;
+  rows: AuditReviewRow[];
+}
+
 export interface ElintAuditReport {
   audit_timestamp: string;
   schDocument: string;
@@ -1068,6 +1101,8 @@ export interface ElintAuditReport {
   warningCount: number;
   diagnostics: ElintDiagnostic[];
   constraintHandoffPackage?: ConstraintHandoffPackage;
+  normalizedSummary?: AuditNormalizedSummary;
+  uncoveredItems?: AuditCoverageItem[];
 }
 
 // ============================================================================
@@ -1295,6 +1330,8 @@ export interface PcbLintReport {
     warning_count: number;
   };
   customGeoLintFindings: PlintFinding[];
+  normalizedSummary?: AuditNormalizedSummary;
+  uncoveredItems?: AuditCoverageItem[];
   arrayCursor?: string;
 }
 
@@ -1318,6 +1355,8 @@ export interface MasterValidationReport {
     code: string;
     message: string;
   }>;
+  normalizedSummary?: AuditNormalizedSummary;
+  uncoveredItems?: AuditCoverageItem[];
 }
 
 // ============================================================================

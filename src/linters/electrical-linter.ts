@@ -1,4 +1,5 @@
 import type {
+  AuditCoverageItem,
   CesmModel,
   CompiledNetlist,
   ConstraintHandoffPackage,
@@ -11,6 +12,7 @@ import type {
   Keepout25DFiveTuple,
   PerNetRoutingRule,
 } from "../types/index.js";
+import { normalizeElintDiagnostics } from "./audit-normalizer.js";
 import {
   buildElectricalHypergraph,
   type CesmResolver,
@@ -32,6 +34,12 @@ export interface ElectricalLinterOptions {
   cesmResolver?: CesmResolver;
   strictness?: "production" | "prototype";
   ambientTempC?: number;
+  /** True if only a subset of schematic sheets was compiled (warns that cross-page degree=1 nets cannot be judged). */
+  isPartialSheetScope?: boolean;
+  /** Expand folded WARNING groups in normalizedSummary. */
+  expandAllWarnings?: boolean;
+  /** Fold threshold for repeated WARNING diagnostics (default: 6). */
+  groupThreshold?: number;
 }
 
 const DEFAULT_BUILT_IN_CESM: Record<string, CesmModel> = {
@@ -275,6 +283,35 @@ export function runElectricalLinter(
     ? buildConstraintHandoffPackage(graph)
     : undefined;
 
+  const uncoveredItems: AuditCoverageItem[] = [];
+  if (options?.isPartialSheetScope) {
+    uncoveredItems.push({
+      area: "CROSS_PAGE_NET_COMPLETENESS",
+      status: "DEGRADED",
+      reason: "Partial-sheet schematic compilation: cross-page nets appear as degree=1 on a single sheet; merge all sheets before judging dangling nets.",
+      evidenceSource: "options.isPartialSheetScope",
+    });
+  }
+  const missingCesmDesignators: string[] = [];
+  for (const node of graph.components.values()) {
+    if (node.component.extraProps?.virtualMechanical === true) continue;
+    if (!node.cesm) missingCesmDesignators.push(node.designator);
+  }
+  if (missingCesmDesignators.length > 0) {
+    const sample = missingCesmDesignators.slice(0, 5).join(", ");
+    uncoveredItems.push({
+      area: "CESM_DATASHEET_RATINGS",
+      status: "DEGRADED",
+      reason: `${missingCesmDesignators.length} component(s) lack verified CESM datasheet bindings (${sample}${missingCesmDesignators.length > 5 ? ", ..." : ""}); absolute-max voltage/thermal checks fell back to conservative package defaults.`,
+      evidenceSource: "cesmResolver",
+    });
+  }
+
+  const normalizedSummary = normalizeElintDiagnostics(diagnostics, {
+    expandAllWarnings: options?.expandAllWarnings,
+    groupThreshold: options?.groupThreshold,
+  });
+
   return {
     audit_timestamp: new Date().toISOString(),
     schDocument: graph.documentName,
@@ -284,6 +321,8 @@ export function runElectricalLinter(
     warningCount,
     diagnostics,
     ...(constraintHandoffPackage ? { constraintHandoffPackage } : {}),
+    normalizedSummary,
+    uncoveredItems,
   };
 }
 

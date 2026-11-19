@@ -48,12 +48,47 @@ export type {
   PcbIsolationSlotGeom,
   PcbMountingHoleGeom,
   PcbNativeDrcInput,
+  PcbObservationMeta,
   PcbPadGeom,
   PcbPourGeom,
   PcbTestPointGeom,
   PcbTrackGeom,
   PcbViaGeom,
 } from "./geometry-pcb-linter.js";
+
+export {
+  MIL_TO_MM,
+  classifyCopperSensitiveComponent,
+  computeContoursBbox,
+  parseEasyEdaContour,
+  parseEasyEdaRect,
+  parseEasyEdaSourceContours,
+  pointInComplexContours,
+  pointInContour2D,
+  selfCheckSourceGeometry,
+} from "./easyeda-source-geom.js";
+
+export type {
+  Bbox2D,
+  Contour2D,
+  CopperSensitiveKind,
+  EasyEdaSourceParseOptions,
+  Point2D,
+  SourceGeomSelfCheckEntry,
+  SourceGeomSelfCheckReport,
+} from "./easyeda-source-geom.js";
+
+export {
+  normalizeAuditFindings,
+  normalizeElintDiagnostics,
+  normalizeMasterReport,
+  normalizePlintFindings,
+} from "./audit-normalizer.js";
+
+export type {
+  AuditNormalizeOptions,
+  RawAuditFinding,
+} from "./audit-normalizer.js";
 
 export {
   runMasterValidation,

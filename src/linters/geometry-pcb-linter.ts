@@ -1,5 +1,6 @@
 import { Clipper, FillRule, Point64, type Path64, type Paths64 } from "clipper2-js";
 import type {
+  AuditCoverageItem,
   CesmModel,
   CompiledNetlist,
   ConstraintHandoffPackage,
@@ -11,6 +12,16 @@ import type {
   PlintFinding,
   ProjectDesignRules,
 } from "../types/index.js";
+import { normalizePlintFindings } from "./audit-normalizer.js";
+import {
+  classifyCopperSensitiveComponent,
+  parseEasyEdaSourceContours,
+  pointInComplexContours,
+  selfCheckSourceGeometry,
+  type Contour2D,
+  type SourceGeomSelfCheckEntry,
+  type SourceGeomSelfCheckReport,
+} from "./easyeda-source-geom.js";
 import {
   buildElectricalHypergraph,
   type CesmResolver,
@@ -102,9 +113,30 @@ export interface PcbPourGeom {
   layer: string;
   polygon2D: Array<[number, number]>;
   holes2D?: Array<Array<[number, number]>>;
+  /** Optional EasyEDA native `source` compact polygon/rect/arc syntax for even-odd complex fills. */
+  rawSource?: unknown;
+  /** Coordinate unit of `rawSource` (default: "mm"). */
+  sourceUnit?: "mm" | "mil";
+  /** Optional platform ground-truth bbox [minX, minY, maxX, maxY] in mm for geometry self-check. */
+  expectedBboxMm?: [number, number, number, number];
+  /** Set false when pour outline exists on PCB but has not been rebuilt/materialized into copper islands. */
+  materialized?: boolean;
   areaMm2?: number;
   isSolid?: boolean;
   splitSlots?: Array<{ x1: number; y1: number; x2: number; y2: number }>;
+}
+
+export interface PcbObservationMeta {
+  /** Availability status of copper telemetry categories (e.g., `{ poured: "unavailable" }`). */
+  copperAvailability?: Record<string, string>;
+  /** True when editable pour outlines exist but poured copper islands were not materialized/rebuilt. */
+  hasUnmaterializedPourOutlines?: boolean;
+  /** Present when native platform DRC aborted early (e.g., due to Netlist Error). */
+  nativeDrcAbortedReason?: string | null;
+  /** True only when stackup dielectric constant (Er) and prepreg thickness are available from EDA. */
+  stackupDielectricAvailable?: boolean;
+  /** Any degraded geometry/telemetry observations (e.g., outline downgraded to AABB). */
+  degradedNotes?: string[];
 }
 
 export interface PcbMountingHoleGeom {
@@ -163,6 +195,7 @@ export interface PcbBoardGeometrySnapshot {
   mountingHoles?: PcbMountingHoleGeom[];
   testPoints?: PcbTestPointGeom[];
   nativeDrcResult?: PcbNativeDrcInput;
+  observationMeta?: PcbObservationMeta;
   netlist?: CompiledNetlist;
   clusters?: FunctionalClusterOutput;
   constraintHandoff?: ConstraintHandoffPackage;
@@ -173,6 +206,8 @@ export interface PcbBoardGeometrySnapshot {
     useProjectDesignRulesFirst?: boolean;
     fabCapability?: "jlc_standard_multi" | "jlc_2layer_basic";
     ambientTempC?: number;
+    expandAllWarnings?: boolean;
+    groupThreshold?: number;
   };
 }
 
@@ -372,7 +407,36 @@ function ensurePositivePath64(poly: Array<[number, number]>): Path64 {
   return Clipper.isPositive(path) ? path : Clipper.reversePath(path);
 }
 
+const pourSourceContoursCache = new WeakMap<PcbPourGeom, Contour2D[]>();
+
+function getPourSourceContours(pour: PcbPourGeom): Contour2D[] | null {
+  if (pour.rawSource === undefined || pour.rawSource === null) return null;
+  let cached = pourSourceContoursCache.get(pour);
+  if (!cached) {
+    cached = parseEasyEdaSourceContours(pour.rawSource, {
+      unit: pour.sourceUnit ?? "mm",
+    });
+    pourSourceContoursCache.set(pour, cached);
+  }
+  return cached;
+}
+
+function isPourMaterialized(pour: PcbPourGeom): boolean {
+  if (pour.materialized === false) return false;
+  const sourceContours = getPourSourceContours(pour);
+  if (sourceContours && sourceContours.length > 0) return true;
+  return pour.polygon2D.length >= 3;
+}
+
 function buildPourPaths64(pour: PcbPourGeom): Paths64 {
+  const sourceContours = getPourSourceContours(pour);
+  if (sourceContours && sourceContours.length > 0) {
+    const rawPaths: Paths64 = sourceContours
+      .filter((c) => c.length >= 3)
+      .map(toPath64);
+    if (rawPaths.length === 0) return [];
+    return Clipper.Union(rawPaths, [], FillRule.EvenOdd);
+  }
   if (pour.polygon2D.length < 3) return [];
   const outer: Paths64 = [ensurePositivePath64(pour.polygon2D)];
   const validHoles = (pour.holes2D ?? []).filter((h) => h.length >= 3);
@@ -382,6 +446,11 @@ function buildPourPaths64(pour: PcbPourGeom): Paths64 {
 }
 
 function computePourNetAreaMm2(pour: PcbPourGeom): number {
+  const sourceContours = getPourSourceContours(pour);
+  if (sourceContours && sourceContours.length > 0) {
+    const paths = buildPourPaths64(pour);
+    return paths.length === 0 ? 0 : Math.abs(Clipper.areaPaths(paths)) / (CLIPPER_SCALE * CLIPPER_SCALE);
+  }
   const hasHoles = Boolean(pour.holes2D && pour.holes2D.some((h) => h.length >= 3));
   if (!hasHoles && pour.areaMm2 !== undefined) return pour.areaMm2;
   if (pour.polygon2D.length < 3) return pour.areaMm2 ?? 0;
@@ -394,7 +463,20 @@ function computePourOverlapAreaMm2(
   pour: PcbPourGeom,
   targetPoly: Array<[number, number]>
 ): number {
-  if (pour.polygon2D.length < 3 || targetPoly.length < 3) return 0;
+  if (targetPoly.length < 3) return 0;
+  if (!isPourMaterialized(pour)) return 0;
+  const sourceContours = getPourSourceContours(pour);
+  if (sourceContours && sourceContours.length > 0) {
+    const subjectPaths = buildPourPaths64(pour);
+    if (subjectPaths.length === 0) return 0;
+    const res = Clipper.Intersect(
+      subjectPaths,
+      [ensurePositivePath64(targetPoly)],
+      FillRule.EvenOdd
+    );
+    return res.length === 0 ? 0 : Math.abs(Clipper.areaPaths(res)) / (CLIPPER_SCALE * CLIPPER_SCALE);
+  }
+  if (pour.polygon2D.length < 3) return 0;
   const hasHoles = Boolean(pour.holes2D && pour.holes2D.some((h) => h.length >= 3));
   if (!hasHoles) {
     return computePolygonOverlapAreaMm2(pour.polygon2D, targetPoly);
@@ -411,6 +493,11 @@ function computePourOverlapAreaMm2(
 }
 
 function isPointInPour2D(pt: [number, number], pour: PcbPourGeom): boolean {
+  if (!isPourMaterialized(pour)) return false;
+  const sourceContours = getPourSourceContours(pour);
+  if (sourceContours && sourceContours.length > 0) {
+    return pointInComplexContours(pt, sourceContours);
+  }
   if (!pointInPolygon2D(pt, pour.polygon2D)) return false;
   if (pour.holes2D && pour.holes2D.length > 0) {
     for (const hole of pour.holes2D) {
@@ -531,6 +618,21 @@ export function runGeometryPcbLinter(board: PcbBoardGeometrySnapshot): PcbLintRe
   const hypergraph = board.netlist ? buildElectricalHypergraph(board.netlist, resolver) : undefined;
   const findings: PlintFinding[] = [];
 
+  // Pre-check EasyEDA rawSource geometry against platform bbox & dual-ARC circle invariants
+  const rawSourceEntries: SourceGeomSelfCheckEntry[] = [];
+  for (const pour of board.pours) {
+    if (pour.rawSource !== undefined && pour.rawSource !== null) {
+      rawSourceEntries.push({
+        id: pour.primitiveId,
+        source: pour.rawSource,
+        expectedBboxMm: pour.expectedBboxMm,
+        unit: pour.sourceUnit ?? "mm",
+      });
+    }
+  }
+  const sourceGeomSelfCheck =
+    rawSourceEntries.length > 0 ? selfCheckSourceGeometry(rawSourceEntries) : null;
+
   checkPlint01AntiQueueingAndDispersion(board, findings);
   checkPlint02DecouplingDistanceAndOrder(board, findings);
   checkPlint03VoltageDeratingAndResistorAcross(board, hypergraph, resolver, findings);
@@ -541,6 +643,7 @@ export function runGeometryPcbLinter(board: PcbBoardGeometrySnapshot): PcbLintRe
   checkPlint08LdoThermalCopperArea(board, hypergraph, resolver, findings);
   checkPlint09EsdStubViasAndCj(board, resolver, findings);
   checkPlint10Keepout25D(board, stackup, findings);
+  checkSensitiveCopperAndKeepoutLayerGaps(board, stackup, resolver, findings);
   checkPlint11CrystalLayerRules(board, stackup, resolver, findings);
   checkPlint12MechanicalAndThermalStress(board, resolver, findings);
   checkPlint13PowerWidthViasAndIrDrop(board, effectiveDesignRules, copperOz, findings);
@@ -565,6 +668,12 @@ export function runGeometryPcbLinter(board: PcbBoardGeometrySnapshot): PcbLintRe
   const blockerCount = scopedFindings.filter((f) => f.severity === "BLOCKER").length;
   const warningCount = scopedFindings.filter((f) => f.severity === "WARNING").length;
 
+  const uncoveredItems = collectPcbUncoveredItems(board, sourceGeomSelfCheck);
+  const normalizedSummary = normalizePlintFindings(scopedFindings, nativeDrcErrors, {
+    expandAllWarnings: board.options?.expandAllWarnings,
+    groupThreshold: board.options?.groupThreshold,
+  });
+
   const pass = unroutedRatlineCount === 0 && nativeDrcErrors.length === 0 && blockerCount === 0;
 
   return {
@@ -578,6 +687,8 @@ export function runGeometryPcbLinter(board: PcbBoardGeometrySnapshot): PcbLintRe
       warning_count: warningCount,
     },
     customGeoLintFindings: scopedFindings,
+    normalizedSummary,
+    uncoveredItems,
   };
 }
 
@@ -1748,6 +1859,285 @@ function makePlint10Finding(
     autoFixAction: "REMOVE_INTRUDING_PRIMITIVE_IN_LAYERSET",
     prescription: `Remove ${kind} ${primId} on ${layer} intersecting 2.5D Keep-out '${ko.id ?? ko.category ?? "zone"}' (layers: ${ko.layerSet.join(",")}).`,
   };
+}
+
+/**
+ * Binary per-pad, per-layer copper check for sensitive components (crystal, antenna,
+ * oscillator, inductor) + partial-layer no-pour keepout gap detection.
+ *
+ * Uses point-in-complex-polygon (even-odd) binary copper detection rather than
+ * ambiguous coverage percentages, and respects 4-layer+ inner GND reference planes.
+ */
+function checkSensitiveCopperAndKeepoutLayerGaps(
+  board: PcbBoardGeometrySnapshot,
+  stackup: string[],
+  resolver: CesmResolver,
+  out: PlintFinding[]
+): void {
+  const materializedPours = board.pours.filter(isPourMaterialized);
+  if (materializedPours.length === 0) return;
+
+  const is4PlusLayers = board.boardOutline.layerCount >= 4;
+  const poursByLayer = new Map<string, PcbPourGeom[]>();
+  for (const p of materializedPours) {
+    const lay = normalizeLayerName(p.layer);
+    const list = poursByLayer.get(lay) ?? [];
+    list.push(p);
+    poursByLayer.set(lay, list);
+  }
+
+  const findCopperAtPoint = (pt: [number, number], layer: string): PcbPourGeom | null => {
+    const list = poursByLayer.get(layer);
+    if (!list || list.length === 0) return null;
+    for (const pour of list) {
+      if (isPointInPour2D(pt, pour)) return pour;
+    }
+    return null;
+  };
+
+  const allKeepouts: Keepout25DFiveTuple[] = [
+    ...(board.keepoutZones ?? []),
+    ...(board.constraintHandoff?.keepoutZones25D ?? []).filter(
+      (k) => !(board.keepoutZones ?? []).some((ek) => ek.id && ek.id === k.id)
+    ),
+  ];
+
+  // Resolve keepout layers once
+  const noPourKeepouts = allKeepouts
+    .filter((k) => k.disallowMask.includes("COPPER_POUR"))
+    .map((k) => ({
+      ko: k,
+      layers: resolveKeepoutLayers(k, stackup),
+    }));
+
+  const existingPourViolations = new Set(
+    out
+      .filter((f) => f.ruleId === "PLINT-10" && f.category === "25D_KEEPOUT_VIOLATION_COPPER_POUR")
+      .map((f) => `${f.involvedPrimitives.join("::")}@${normalizeLayerName(f.layer)}`)
+  );
+
+  const sensitiveComps: Array<{
+    comp: PcbComponentGeom;
+    kind: "crystal" | "oscillator" | "antenna" | "inductor";
+  }> = [];
+
+  for (const comp of board.components) {
+    const cat = getCompCategory(comp, resolver);
+    const kind = classifyCopperSensitiveComponent(comp.designator, comp.mpn ?? comp.value, comp.package, cat);
+    if (!kind) continue;
+    sensitiveComps.push({ comp, kind });
+
+    const mountLayer = normalizeLayerName(comp.layer);
+    const layersToCheck =
+      kind === "antenna"
+        ? stackup
+        : is4PlusLayers
+          ? [mountLayer]
+          : stackup; // 2-layer boards: both TopLayer and BottomLayer affect crystal/inductor parasitics
+
+    const ownerAllowedNetsByLayer = new Map<string, Set<string>>();
+    for (const entry of noPourKeepouts) {
+      if (entry.ko.ownerDesignator === comp.designator) {
+        for (const l of entry.layers) {
+          const set = ownerAllowedNetsByLayer.get(l) ?? new Set<string>();
+          for (const net of entry.ko.allowedNets) set.add(net);
+          ownerAllowedNetsByLayer.set(l, set);
+        }
+      }
+    }
+
+    const severity: "BLOCKER" | "WARNING" =
+      kind === "crystal" || kind === "antenna" ? "BLOCKER" : "WARNING";
+
+    const sigPads = comp.pads.filter((pad) => {
+      const n = (pad.net ?? "").trim();
+      return Boolean(n) && !isGroundNetName(n);
+    });
+
+    for (const pad of sigPads) {
+      const padNet = (pad.net ?? "").trim();
+      for (const lay of layersToCheck) {
+        const hitPour = findCopperAtPoint(pad.centerMm, lay);
+        if (!hitPour) continue;
+        if (hitPour.net === padNet) continue;
+        if (ownerAllowedNetsByLayer.get(lay)?.has(hitPour.net)) continue;
+
+        // Avoid duplicating an already-emitted PLINT-10 keepout pour violation for the exact same pair
+        const dupKey = `${hitPour.primitiveId}::${comp.designator}@${lay}`;
+        if (existingPourViolations.has(dupKey)) continue;
+
+        out.push({
+          ruleId: "PLINT-10",
+          severity,
+          category: "SENSITIVE_PAD_UNDER_FOREIGN_COPPER",
+          net: padNet,
+          involvedPrimitives: [`${comp.designator}.${pad.padNumber}`, hitPour.primitiveId],
+          locationMm: pad.centerMm,
+          layer: lay,
+          measuredValue: `${comp.designator}.${pad.padNumber} (${padNet}) covered by foreign copper '${hitPour.net}' on ${lay}`,
+          threshold: "Binary pad-center copper check: no foreign copper under sensitive signal pad",
+          autoFixAction: "ADD_LAYER_COPPER_KEEPOUT_UNDER_SENSITIVE_PAD",
+          prescription: `Add a COPPER_POUR keepout cutout on ${lay} under ${comp.designator} (${kind}) signal pad ${pad.padNumber} ('${padNet}') to prevent '${hitPour.net}' copper parasitics.`,
+        });
+      }
+    }
+  }
+
+  // Check 2: Partial-layer no-pour keepout gap on sensitive components (e.g. Top protected, Bottom forgotten on 2L)
+  const bboxesOverlap = (a: [number, number, number, number], b: [number, number, number, number]) =>
+    !(a[2] < b[0] || b[2] < a[0] || a[3] < b[1] || b[3] < a[1]);
+
+  for (const { ko, layers: protectedLayers } of noPourKeepouts) {
+    if (protectedLayers.size === 0 || protectedLayers.size >= stackup.length) continue;
+    if (ko.polygon2D.length < 3) continue;
+
+    const xs = ko.polygon2D.map((p) => p[0]);
+    const ys = ko.polygon2D.map((p) => p[1]);
+    const koBbox: [number, number, number, number] = [
+      Math.min(...xs),
+      Math.min(...ys),
+      Math.max(...xs),
+      Math.max(...ys),
+    ];
+    const center: [number, number] = [
+      (koBbox[0] + koBbox[2]) / 2,
+      (koBbox[1] + koBbox[3]) / 2,
+    ];
+
+    const matchedHosts = sensitiveComps.filter(
+      ({ comp }) =>
+        (ko.ownerDesignator && ko.ownerDesignator === comp.designator) ||
+        bboxesOverlap(koBbox, comp.bboxMm)
+    );
+    if (matchedHosts.length === 0) continue;
+
+    const hasAntennaHost = matchedHosts.some((h) => h.kind === "antenna");
+    // On 4L+ boards, single-layer MOUNT_LAYER keepout for crystal/inductor with solid InnerLayer GND reference is intentional.
+    if (is4PlusLayers && !hasAntennaHost) continue;
+
+    for (const otherLayer of stackup) {
+      if (protectedLayers.has(otherLayer)) continue;
+      const otherPour = findCopperAtPoint(center, otherLayer);
+      if (!otherPour) continue;
+
+      const coveredByOtherKeepout = noPourKeepouts.some(
+        (other) =>
+          other.layers.has(otherLayer) &&
+          other.ko.polygon2D.length >= 3 &&
+          pointInPolygon2D(center, other.ko.polygon2D)
+      );
+      if (coveredByOtherKeepout) continue;
+
+      const hostSummary = matchedHosts
+        .slice(0, 3)
+        .map((h) => `${h.comp.designator}(${h.kind})`)
+        .join(", ");
+
+      out.push({
+        ruleId: "PLINT-10",
+        severity: "WARNING",
+        category: "KEEPOUT_PARTIAL_LAYER_GAP",
+        net: otherPour.net,
+        involvedPrimitives: [ko.id ?? ko.ownerDesignator ?? "KEEPOUT_NO_POUR", otherPour.primitiveId],
+        locationMm: center,
+        layer: otherLayer,
+        measuredValue: `Protected on [${Array.from(protectedLayers).join(",")}], but '${otherPour.net}' copper exists on unprotected ${otherLayer}`,
+        threshold: "Consistent no-pour keepout coverage across affected copper layers",
+        autoFixAction: "EXTEND_NO_POUR_KEEPOUT_TO_MISSING_LAYER",
+        prescription: `No-pour keepout '${ko.id ?? ko.ownerDesignator ?? "zone"}' protects ${hostSummary} on [${Array.from(protectedLayers).join(",")}], but ${otherLayer} still has '${otherPour.net}' pour without a matching keepout. Extend keepout to ${otherLayer} or MultiLayer if unintended.`,
+      });
+    }
+  }
+}
+
+function collectPcbUncoveredItems(
+  board: PcbBoardGeometrySnapshot,
+  sourceGeomSelfCheck: SourceGeomSelfCheckReport | null
+): AuditCoverageItem[] {
+  const uncovered: AuditCoverageItem[] = [];
+  const meta = board.observationMeta;
+
+  // 1. Unmaterialized / missing copper pours: "not readable / empty" != "passed"
+  const materializedPours = board.pours.filter(isPourMaterialized);
+  const unmaterializedCount = board.pours.length - materializedPours.length;
+
+  if (meta?.hasUnmaterializedPourOutlines || (board.pours.length > 0 && materializedPours.length === 0)) {
+    uncovered.push({
+      area: "COPPER_POUR_AUDIT",
+      status: "UNCOVERED",
+      reason: `Board has ${unmaterializedCount || board.pours.length} unmaterialized pour outline(s) without rebuilt copper islands; sensitive-pad copper & keepout effectiveness could not be verified (NOT a pass).`,
+      evidenceSource: "board.pours / observationMeta.hasUnmaterializedPourOutlines",
+    });
+  } else if (board.pours.length === 0) {
+    uncovered.push({
+      area: "COPPER_POUR_AUDIT",
+      status: "UNCOVERED",
+      reason: "No materialized copper pours present in PCB snapshot; copper-under-sensitive-component and keepout-pour checks were not evaluated (NOT a pass).",
+      evidenceSource: "board.pours (length=0)",
+    });
+  }
+
+  // 2. Non-available copper telemetry fields
+  if (meta?.copperAvailability) {
+    for (const [field, availability] of Object.entries(meta.copperAvailability)) {
+      if (availability && availability !== "available") {
+        uncovered.push({
+          area: `COPPER_TELEMETRY_${field.toUpperCase()}`,
+          status: "DEGRADED",
+          reason: `Copper observation '${field}' reported availability='${availability}'; copper audit results may be incomplete.`,
+          evidenceSource: `observationMeta.copperAvailability.${field}`,
+        });
+      }
+    }
+  }
+
+  // 3. Native DRC aborted (e.g. Netlist Error stops spacing checks early)
+  const drcErrors = board.nativeDrcResult?.errors ?? [];
+  const netlistErrInDrc = drcErrors.find((e) =>
+    /netlist\s*error/i.test(`${e.code ?? ""} ${e.message}`)
+  );
+  if (meta?.nativeDrcAbortedReason || netlistErrInDrc) {
+    uncovered.push({
+      area: "NATIVE_PLATFORM_DRC",
+      status: "DEGRADED",
+      reason: `Native platform DRC aborted/degraded (${meta?.nativeDrcAbortedReason ?? netlistErrInDrc?.message}); native clearance/rule results may be incomplete until netlist sync is restored.`,
+      evidenceSource: "nativeDrcResult / observationMeta.nativeDrcAbortedReason",
+    });
+  }
+
+  // 4. Controlled impedance requires dielectric constant (Er) & prepreg thickness not exposed by standard EDA API
+  if (meta?.stackupDielectricAvailable !== true) {
+    uncovered.push({
+      area: "CONTROLLED_IMPEDANCE",
+      status: "UNCOVERED",
+      reason: "Stackup dielectric constant (Er) and prepreg thickness are unavailable from standard EDA telemetry; controlled-impedance verification is not covered.",
+      evidenceSource: "observationMeta.stackupDielectricAvailable",
+    });
+  }
+
+  // 5. EasyEDA rawSource geometry self-check failures
+  if (sourceGeomSelfCheck && !sourceGeomSelfCheck.passed) {
+    for (const reason of sourceGeomSelfCheck.degradedReasons) {
+      uncovered.push({
+        area: "SOURCE_GEOMETRY_SELFCHECK",
+        status: "DEGRADED",
+        reason,
+        evidenceSource: "selfCheckSourceGeometry",
+      });
+    }
+  }
+
+  // 6. Explicit telemetry degradation notes (e.g., outline downgraded to AABB)
+  for (const note of meta?.degradedNotes ?? []) {
+    uncovered.push({
+      area: "TELEMETRY_DEGRADATION",
+      status: "DEGRADED",
+      reason: note,
+      evidenceSource: "observationMeta.degradedNotes",
+    });
+  }
+
+  return uncovered;
 }
 
 // ============================================================================

@@ -8,7 +8,7 @@
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D26.0-339933?style=flat-square&logo=node.js&logoColor=white)](https://nodejs.org)
 [![Platform](https://img.shields.io/badge/Platform-Windows-0078D6?style=flat-square&logo=windows&logoColor=white)](#快速上手)
 [![Tools](https://img.shields.io/badge/MCP%20Tools-43-2563EB?style=flat-square)](#mcp-工具清单6-层共-43-个)
-[![Tests](https://img.shields.io/badge/Tests-98%20Passing-16A34A?style=flat-square)](#cli-与开发验证)
+[![Tests](https://img.shields.io/badge/Tests-105%20Passing-16A34A?style=flat-square)](#cli-与开发验证)
 
 [为什么用它](#为什么选择-jlceda-mcp) · [快速上手](#快速上手) · [使用示例](#你可以这样对-ai-说) · [闭环架构](#设计闭环架构) · [43 个工具清单](#mcp-工具清单6-层共-43-个)
 
@@ -26,6 +26,7 @@
 | **网表误判** | 读取导线二维坐标硬算连通，经常漏连或误连 | 100% 唯一采信官方编译器 `eda.sch_Netlist` 权威网表 |
 | **原理图带病转 PCB** | 缺少硬门禁，电源反接/悬空直接带进板子 | 内置 **28 条 `ELINT` 电气硬检**，0 Blocker 方可解锁同步 |
 | **布局布线不可用** | 器件乱堆、铜皮孤岛、FB 紧贴 SW 干扰节点 | Leiden 聚类 + 原厂 `Layout Example` 优先 + 四级布线 + **18 条 2.5D `PLINT`** |
+| **大板审计噪音与盲区误判** | 数百条重复告警刷屏；把铺铜未重建、DRC 中止或 2 层板底层误铺铜当成“通过” | 去重折叠五列摘要 + EasyEDA `source` 奇偶自检与逐层二值判铜 + `uncoveredItems` 盲区显式声明 |
 | **客户端配置繁琐** | 每个 AI 客户端都要复制一大坨路径 `env` | **环境与挂载解耦**：`setup` 一次托管至 `~/.jlceda-mcp/config.json`，客户端**零 `env`** |
 
 ---
@@ -86,8 +87,8 @@ npm run setup
 > **1. 从零设计一块可打样板卡**  
 > “打开嘉立创EDA，新建一个 24V 转 5V/3.3V 的工业 RS485 采集板工程：先在立创基础库选型并解析 Datasheet，完成原理图绘制与 28 条电气审计，再按模块聚类布局、优先布好功率环路和差分线、铺铜加防立碑焊盘，最后跑总门禁并导出 Gerber、BOM 和 CPL。”
 
-> **2. 接手老工程做硬核体检**  
-> “连接我当前打开的嘉立创工程，读取权威网表跑一遍 `jlc_elec_lint` 和 `jlc_pcb_drc_and_lint`，把所有 Blocker 问题高亮出来，并用 `jlc_view_capture` 截图对照原厂 Datasheet `Layout Example` 给我整改建议。”
+> **2. 接手老工程做硬核体检（只读复核）**  
+> “只读连接我当前打开的嘉立创工程，读取权威网表跑一遍 `jlc_elec_lint` 和 `jlc_pcb_drc_and_lint`：按去重折叠摘要列出所有 Blocker（含 2 层板敏感器件底层误铺铜与单层禁布区漏配），把 `uncoveredItems` 里的未覆盖/降级项一并说明，并用 `jlc_view_capture` 截图对照原厂 Datasheet `Layout Example` 给我整改建议。”
 
 > **3. 精准计算并复用标准子电路**  
 > “帮我算一下 12V 转 3.3V/2A 同步 Buck 的电感电容和分压反馈电阻（吸附到 E96 标准值），然后直接实例化一个标准 Type-C 5V UFP 供电积木和 PMOS 防反接积木。”
@@ -113,6 +114,7 @@ flowchart LR
 - **零伪源码落盘**：REA 逆向索引全程在内存中解析 `.d.ts` 与 AST 特征指纹，严格保证 **0 字节反编译源码写入磁盘**，并内置 `verify-zero-source` 审计门禁。
 - **零侵入原软件**：不修改嘉立创EDA 安装目录内任何原始文件（保护 `innerSign` 签名完整），不绕过官方登录/激活机制，不强杀用户已打开的编辑窗口。
 - **双引擎确定性护栏**：用确定性数学计算器 + 官方编译态网表 + 28 条 `ELINT` + 18 条 2.5D `PLINT` + 四合一 `jlc_validate` 兜底，消除大模型数值与几何幻觉。
+- **证据链、降噪折叠与盲区显式声明**：所有审计报告自动执行“定位指纹去重 → 严重度排序 → 同类高频 `WARNING` 折叠（`BLOCKER` 永不折叠）”并输出 `normalizedSummary`；EasyEDA `source` 多轮廓按奇偶规则（Even-Odd）解析并用平台 `bbox`/双圆弧自检；凡铺铜未实体化、DRC 因 `Netlist Error` 中止、叠层介电常数缺失或局部单页编译，均写入 `uncoveredItems`，严格贯彻**采集缺失 ≠ 检查通过**。
 - **事务原子保护**：支持跨多步工具调用的 Undo 事务边界（`jlc_transaction`）与交付前自动释放文件锁（`releaseProcess=true`）。
 
 ---
@@ -203,9 +205,9 @@ flowchart LR
 
 | 工具名 | 核心用处 | 典型使用场景 |
 | --- | --- | --- |
-| `jlc_elec_lint` | 基于官方编译态网表执行 28 条原理图确定性电气硬检（`ELINT-001~028`），0 Blocker 方可解锁转 PCB | 原理图画完后查漏补缺（电源反接、悬空引脚、上拉缺失、耐压/电平不匹配等） |
-| `jlc_pcb_drc_and_lint` | 工程原生 DRC 动态驱动 + 18 条 2.5D 计算几何与电磁拓扑硬检（`PLINT-01~18`），先求图层交集消除多层误报 | 布局布线与铺铜后检查间距、孤岛、热环路、FB 靠近 SW 干扰、立碑风险等 |
-| `jlc_validate` | 交付前四合一总门禁：SCH-PCB 同步 + 28 条电气 Linter + 原生 DRC & 18 条 2.5D 几何 Linter + SMT BOM/CPL 可制造性 | 导出 Gerber/BOM/CPL 投板前的最终一票否决总验收 |
+| `jlc_elec_lint` | 基于官方编译态网表执行 28 条原理图确定性电气硬检（`ELINT-001~028`），输出去重折叠五列摘要与 `uncoveredItems` 盲区声明，0 Blocker 方可解锁转 PCB | 原理图画完后查漏补缺（电源反接、悬空引脚、上拉缺失、耐压/电平不匹配等） |
+| `jlc_pcb_drc_and_lint` | 工程原生 DRC 动态驱动 + 18 条 2.5D 计算几何与电磁拓扑硬检（`PLINT-01~18`），内置 EasyEDA `source` 奇偶轮廓自检、敏感焊盘逐层二值判铜、单层禁布区缺口检测及降噪/盲区声明 | 布局布线与铺铜后检查间距、孤岛、热环路、FB 靠近 SW 干扰、2 层板晶振底层误铺铜与立碑风险等 |
+| `jlc_validate` | 交付前四合一总门禁：SCH-PCB 同步 + 28 条电气 Linter + 原生 DRC & 18 条 2.5D 几何 Linter + SMT BOM/CPL 可制造性，汇总全链路 `normalizedSummary` 与 `uncoveredItems` | 导出 Gerber/BOM/CPL 投板前的最终一票否决总验收 |
 | `jlc_view_capture` | 输出带公制标尺网格与违例高亮的 PNG 视口图，支持与原厂 Datasheet `Layout Example` 左右双图并排比对 | 人工/多模态视觉复核布局美感、走线整洁度及开关电源/芯片原厂布局还原度 |
 
 </details>
@@ -215,7 +217,7 @@ flowchart LR
 ## CLI 与开发验证
 
 ```bash
-# 编译与全量回归测试（98 项单测 + 黄金板卡 E2E）
+# 编译与全量回归测试（105 项单测 + 黄金板卡 E2E）
 npm run build
 npm test
 

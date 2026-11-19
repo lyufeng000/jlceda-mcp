@@ -30,13 +30,14 @@ export const jlcElecLintTool: McpToolHandler = {
   name: "jlc_elec_lint",
   layer: 6,
   description:
-    "原理图与权威网表确定性电气审计引擎：100% 唯一基于 eda.sch_Netlist 编译态权威网表执行 28 条机器硬检规则（ELINT-001~028），0 Blocker 方可解锁转入 PCB。",
+    "原理图与权威网表确定性电气审计引擎：100% 唯一基于 eda.sch_Netlist 编译态权威网表执行 28 条机器硬检规则（ELINT-001~028），0 Blocker 方可解锁转入 PCB；附带去重/折叠五列摘要与未覆盖/降级项显式声明。",
   inputSchema: {
     type: "object",
     required: ["schDocument"],
     properties: {
       schDocument: { type: "string" },
       strictness: { type: "string", enum: ["production", "prototype"], default: "production" },
+      expandAllWarnings: { type: "boolean", default: false },
     },
   },
   async execute(args, context) {
@@ -50,6 +51,7 @@ export const jlcElecLintTool: McpToolHandler = {
     const report = runElectricalLinter(netlist, {
       cesmResolver: state.getCesmResolver(),
       strictness: args.strictness === "prototype" ? "prototype" : "production",
+      expandAllWarnings: args.expandAllWarnings === true,
     });
 
     doc.sch.lastElintReport = report;
@@ -61,7 +63,7 @@ export const jlcPcbDrcAndLintTool: McpToolHandler = {
   name: "jlc_pcb_drc_and_lint",
   layer: 6,
   description:
-    "工程原生 DRC 规则动态驱动 + 18 条 2.5D 计算几何与电磁拓扑 Linter（PLINT-01~18），严格先求 layerSet 图层交集消除多层板背面误报。",
+    "工程原生 DRC 规则动态驱动 + 18 条 2.5D 计算几何与电磁拓扑 Linter（PLINT-01~18），严格先求 layerSet 图层交集消除多层板背面误报；支持 EasyEDA source 奇偶轮廓自检、敏感器件逐层二值判铜、单层禁布区缺口检测、去重折叠摘要及未覆盖项显式声明。",
   inputSchema: {
     type: "object",
     required: ["pcbDocument"],
@@ -78,6 +80,7 @@ export const jlcPcbDrcAndLintTool: McpToolHandler = {
         enum: ["jlc_standard_multi", "jlc_2layer_basic"],
         default: "jlc_standard_multi",
       },
+      expandAllWarnings: { type: "boolean", default: false },
     },
   },
   async execute(args, context) {
@@ -98,6 +101,7 @@ export const jlcPcbDrcAndLintTool: McpToolHandler = {
       fabCapability:
         args.fabCapability === "jlc_2layer_basic" ? "jlc_2layer_basic" : "jlc_standard_multi",
       selectedDesignators,
+      expandAllWarnings: args.expandAllWarnings === true,
     });
 
     const report = runGeometryPcbLinter(snapshot);
@@ -116,7 +120,7 @@ export const jlcValidateTool: McpToolHandler = {
   name: "jlc_validate",
   layer: 6,
   description:
-    "工程交付前四合一综合一票否决总门禁：1) SCH-PCB 权威网表同步；2) 28 条电气 Linter 0 Blocker；3) 原生 PCB DRC + 18 条 2.5D 几何 Linter；4) 嘉立创 SMT BOM/CPL 可制造性。",
+    "工程交付前四合一综合一票否决总门禁：1) SCH-PCB 权威网表同步；2) 28 条电气 Linter 0 Blocker；3) 原生 PCB DRC + 18 条 2.5D 几何 Linter；4) 嘉立创 SMT BOM/CPL 可制造性；附带降噪五列审查摘要与全链路未覆盖/降级项声明。",
   inputSchema: {
     type: "object",
     required: ["schDocument", "pcbDocument"],
@@ -125,6 +129,7 @@ export const jlcValidateTool: McpToolHandler = {
       schDocument: { type: "string" },
       pcbDocument: { type: "string" },
       verifyManufacturability: { type: "boolean", default: true },
+      expandAllWarnings: { type: "boolean", default: false },
     },
   },
   async execute(args, context) {
@@ -189,6 +194,7 @@ export const jlcValidateTool: McpToolHandler = {
       pcbGeometry,
       cesmResolver,
       verifyManufacturability: args.verifyManufacturability !== false,
+      expandAllWarnings: args.expandAllWarnings === true,
       bomEntries,
       cplEntries,
     });

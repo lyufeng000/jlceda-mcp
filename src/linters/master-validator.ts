@@ -1,10 +1,12 @@
 import type {
+  AuditCoverageItem,
   CesmModel,
   CompiledNetlist,
   ElintAuditReport,
   MasterValidationReport,
   PcbLintReport,
 } from "../types/index.js";
+import { normalizeMasterReport } from "./audit-normalizer.js";
 import { createBuiltInCesmResolver, runElectricalLinter } from "./electrical-linter.js";
 import { type PcbBoardGeometrySnapshot, runGeometryPcbLinter } from "./geometry-pcb-linter.js";
 import { AuthoritativeNetlistError, type CesmResolver } from "./hypergraph-propagator.js";
@@ -40,6 +42,8 @@ export interface MasterValidationInput {
   cesmResolver?: CesmResolver;
   verifyManufacturability?: boolean;
   strictness?: "production" | "prototype";
+  expandAllWarnings?: boolean;
+  groupThreshold?: number;
   bomEntries?: BomVerificationEntry[];
   cplEntries?: CplVerificationEntry[];
 }
@@ -320,6 +324,8 @@ export function runMasterValidationWithDetails(
   const elintReport = runElectricalLinter(input.schNetlist, {
     cesmResolver: resolver,
     strictness: input.strictness ?? "production",
+    expandAllWarnings: input.expandAllWarnings,
+    groupThreshold: input.groupThreshold,
   });
 
   for (const diag of elintReport.diagnostics) {
@@ -346,6 +352,11 @@ export function runMasterValidationWithDetails(
     netlist: input.pcbGeometry.netlist ?? input.pcbNetlist,
     constraintHandoff: input.pcbGeometry.constraintHandoff ?? elintReport.constraintHandoffPackage,
     cesmResolver: input.pcbGeometry.cesmResolver ?? resolver,
+    options: {
+      ...input.pcbGeometry.options,
+      expandAllWarnings: input.expandAllWarnings ?? input.pcbGeometry.options?.expandAllWarnings,
+      groupThreshold: input.groupThreshold ?? input.pcbGeometry.options?.groupThreshold,
+    },
   });
 
   const unroutedNets = pcbReport.unroutedRatlineCount;
@@ -404,6 +415,33 @@ export function runMasterValidationWithDetails(
     Math.min(100, 100 - blockers.length * 15 - warnings.length * 3 - unroutedNets * 5)
   );
 
+  // Aggregate uncovered / degraded areas across all 4 validation stages (missing observation != pass)
+  const uncoveredItems: AuditCoverageItem[] = [
+    ...(elintReport.uncoveredItems ?? []),
+    ...(pcbReport.uncoveredItems ?? []),
+  ];
+  if (!netlistInSync && !uncoveredItems.some((u) => u.area === "NATIVE_PLATFORM_DRC")) {
+    uncoveredItems.push({
+      area: "NATIVE_PLATFORM_DRC",
+      status: "DEGRADED",
+      reason: "Schematic-PCB netlist mismatch detected; native EDA DRC clearance checks may abort with Netlist Error until netlist sync is restored.",
+      evidenceSource: "checkNetlistSync",
+    });
+  }
+  if (input.verifyManufacturability === false) {
+    uncoveredItems.push({
+      area: "DFM_SMT_READINESS",
+      status: "SKIPPED",
+      reason: "BOM/CPL manufacturability verification was explicitly skipped (verifyManufacturability=false).",
+      evidenceSource: "input.verifyManufacturability",
+    });
+  }
+
+  const normalizedSummary = normalizeMasterReport(blockers, warnings, {
+    expandAllWarnings: input.expandAllWarnings,
+    groupThreshold: input.groupThreshold,
+  });
+
   return {
     report: {
       pass,
@@ -415,6 +453,8 @@ export function runMasterValidationWithDetails(
       dfmSmtReady,
       blockers,
       warnings,
+      normalizedSummary,
+      uncoveredItems,
     },
     elintReport,
     pcbReport,

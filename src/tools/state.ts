@@ -651,6 +651,7 @@ export function buildPcbGeometrySnapshot(
     useProjectDesignRulesFirst?: boolean;
     fabCapability?: "jlc_standard_multi" | "jlc_2layer_basic";
     selectedDesignators?: string[];
+    expandAllWarnings?: boolean;
   }
 ): PcbBoardGeometrySnapshot {
   if (!doc.pcb) {
@@ -865,6 +866,7 @@ export function buildPcbGeometrySnapshot(
       selectedDesignators: options?.selectedDesignators,
       useProjectDesignRulesFirst: options?.useProjectDesignRulesFirst ?? true,
       fabCapability: options?.fabCapability ?? "jlc_standard_multi",
+      expandAllWarnings: options?.expandAllWarnings,
     },
   };
 }
